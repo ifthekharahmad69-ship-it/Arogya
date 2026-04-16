@@ -1,0 +1,109 @@
+﻿
+> frontend@0.1.0 build
+> next build
+
+node.exe : ΓÜá Warning: 
+Next.js inferred your 
+workspace root, but it 
+may not be correct.
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo      
+        : NotSpecified: 
+(ΓÜá     Warning: 
+Ne...not be     
+correct.:String) [], R  
+  emoteException
+    + 
+FullyQualifiedErrorI    
+d : NativeCommandError
+ 
+ We detected multiple 
+lockfiles and selected 
+the directory of C:\User
+s\ACER\package-lock.json
+ as the root directory.
+ To silence this 
+warning, set 
+`turbopack.root` in 
+your Next.js config, or 
+consider removing one 
+of the lockfiles if 
+it's not needed.
+   See https://nextjs.or
+g/docs/app/api-reference
+/config/next-config-js/t
+urbopack#root-directory 
+for more information.
+ Detected additional 
+lockfiles: 
+   * C:\Users\ACER\OneDr
+ive\Desktop\ssrrk\fronte
+nd\package-lock.json
+
+Γû▓ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+ΓÜá The "middleware" 
+file convention is 
+deprecated. Please use 
+"proxy" instead. Learn 
+more: https://nextjs.org
+/docs/messages/middlewar
+e-to-proxy
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 6.5s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/31) ...
+  Generating static pages using 7 workers (7/31) 
+  Generating static pages using 7 workers (15/31) 
+  Generating static pages using 7 workers (23/31) 
+Γ£ô Generating static pages using 7 workers (31/31) in 728.8ms
+  Finalizing page optimization ...
+
+Route (app)
+Γöî Γùï /
+Γö£ Γùï /_not-found
+Γö£ ╞Æ /api/agent
+Γö£ ╞Æ /api/chat
+Γö£ ╞Æ /api/hospitals
+Γö£ ╞Æ /api/medicines
+Γö£ ╞Æ /api/payment/create-order
+Γö£ ╞Æ /api/payment/verify
+Γö£ ╞Æ /api/predict
+Γö£ ╞Æ /api/quiz
+Γö£ ╞Æ /api/scan-medicine
+Γö£ ╞Æ /api/symptoms
+Γö£ Γùï /dashboard
+Γö£ Γùï /dashboard/ai
+Γö£ Γùï /dashboard/appointments
+Γö£ Γùï /dashboard/diagnostic-centre
+Γö£ Γùï /dashboard/doctors
+Γö£ Γùï /dashboard/emergency
+Γö£ Γùï /dashboard/hospitals
+Γö£ Γùï /dashboard/media
+Γö£ Γùï /dashboard/medicines
+Γö£ Γùï /dashboard/predictors
+Γö£ Γùï /dashboard/quiz
+Γö£ Γùï /dashboard/reports
+Γö£ Γùï /dashboard/scanner
+Γö£ Γùï /dashboard/symptoms
+Γö£ Γùï /dashboard/video-call
+Γö£ Γùï /login
+Γö£ Γùï /register
+Γö£ ╞Æ /sign-in/[[...sign-in]]
+Γöö ╞Æ /sign-up/[[...sign-up]]
+
+
+╞Æ Proxy (Middleware)
+
+Γùï  (Static)   prerendered as static content
+╞Æ  (Dynamic)  server-rendered on demand
+
