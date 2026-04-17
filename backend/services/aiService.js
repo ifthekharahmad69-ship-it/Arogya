@@ -1,6 +1,6 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'demo-key');
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || 'demo-key' });
 
 const AGENT_PROMPTS = {
   symptomChecker: `You are a medical AI assistant called Arogya Raksha Symptom Checker. Analyze the patient's symptoms and provide:
@@ -61,19 +61,27 @@ Respond in JSON format with fields: emergencyLevel, firstAid, hospitalType, inst
 
 async function callGeminiAgent(agentType, userMessage, context = '') {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
     const systemPrompt = AGENT_PROMPTS[agentType] || AGENT_PROMPTS.generalHealth;
-    const fullPrompt = `${systemPrompt}\n\nPatient Context: ${context}\n\nUser Message: ${userMessage}`;
 
-    const result = await model.generateContent(fullPrompt);
-    const response = await result.response;
+    const chatCompletion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Patient Context: ${context}\n\nUser Message: ${userMessage}` },
+      ],
+      temperature: 0.7,
+      max_tokens: 2000,
+    });
+
+    const responseText = chatCompletion.choices?.[0]?.message?.content || '';
+
     return {
       success: true,
-      data: response.text(),
+      data: responseText,
       agent: agentType,
     };
   } catch (error) {
-    console.error(`Gemini AI error (${agentType}):`, error.message);
+    console.error(`Groq AI error (${agentType}):`, error.message);
     return {
       success: false,
       error: error.message,

@@ -13,11 +13,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Allow external image domains for doctor profile images
-  eslint: {
-    // Don't fail production builds on lint warnings
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     // Don't fail production builds on TS errors (we fix later)
     ignoreBuildErrors: true,

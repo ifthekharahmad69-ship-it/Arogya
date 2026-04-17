@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
@@ -11,6 +12,9 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
+
+// Gzip compression — reduces response sizes by 60-80%
+app.use(compression());
 
 // Socket.io setup
 const io = new Server(httpServer, {
@@ -30,12 +34,25 @@ const io = new Server(httpServer, {
 app.use(helmet());
 app.use(morgan('dev'));
 
+// General API limiter — generous enough for normal app usage
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests, please try again later.',
+  max: 500, // 500 requests per 15 min per IP (was 100 — too low for SPAs)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests, please try again later.' },
 });
 app.use('/api/', limiter);
+
+// Strict limiter for auth endpoints only (prevent brute-force)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30, // 30 auth attempts per 15 min per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many auth attempts, please try again later.' },
+});
+app.use('/api/auth', authLimiter);
 
 // Allowed origins for CORS
 const allowedOrigins = [
