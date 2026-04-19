@@ -8,6 +8,7 @@ import {
   Star, TrendingUp, Clock, Search, Loader2
 } from 'lucide-react';
 import { quizCategories, QuizCategory, QuizQuestion } from './quizData';
+import HealthcareCTA from '@/components/HealthcareCTA';
 
 type Screen = 'categories' | 'quiz' | 'results';
 
@@ -654,6 +655,15 @@ function ResultsScreen({ category, score, answers, onRetry, onHome }: ResultsScr
             >
               <ArrowLeft className="h-5 w-5" /> All Categories
             </button>
+          </div>
+
+          {/* Healthcare CTA — Loan & Nearby Hospitals */}
+          <div className="mt-6">
+            <HealthcareCTA
+              context={`After completing your ${category.name} health quiz`}
+              condition={category.name}
+              variant="compact"
+            />
           </div>
         </div>
       </div>

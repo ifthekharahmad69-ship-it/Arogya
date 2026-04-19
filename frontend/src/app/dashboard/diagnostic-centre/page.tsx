@@ -9,6 +9,7 @@ import {
   Droplets, Zap, X, MessageSquare, CreditCard
 } from 'lucide-react';
 import RazorpayCheckout from '@/components/RazorpayCheckout';
+import HealthcareCTA from '@/components/HealthcareCTA';
 
 /* ═══════════ DATA ═══════════ */
 
@@ -453,6 +454,13 @@ export default function DiagnosticCentrePage() {
           ))}
         </div>
       </section>
+
+      {/* ─── Healthcare CTA — Loan & Hospitals ─── */}
+      <HealthcareCTA
+        context="Need financial assistance for your diagnostic tests?"
+        condition="diagnostic tests"
+        variant="wide"
+      />
 
       {/* ─── CTA Section ─── */}
       <div className="bg-gradient-to-r from-violet-600 to-indigo-700 rounded-[2rem] p-8 lg:p-12 text-white text-center relative overflow-hidden">

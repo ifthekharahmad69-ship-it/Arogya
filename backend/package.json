@@ -5,6 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "seed": "node scripts/seedAll.js",
+    "seed:hospitals": "node scripts/seedHospitals.js",
+    "seed:medicines": "node scripts/seedMedicines.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

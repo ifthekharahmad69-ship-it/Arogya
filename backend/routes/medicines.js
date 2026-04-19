@@ -3,7 +3,7 @@ const router = express.Router();
 const Medicine = require('../models/Medicine');
 const { callGeminiAgent } = require('../services/aiService');
 
-// Search medicines
+// Search medicines (enhanced — searches name, generic, category, manufacturer)
 router.get('/search', async (req, res) => {
   try {
     const { q } = req.query;
@@ -16,7 +16,42 @@ router.get('/search', async (req, res) => {
       return res.json({ success: true, medicines: [], aiResponse: aiResult.data });
     }
 
-    res.json({ success: true, medicines });
+    res.json({ success: true, count: medicines.length, medicines });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get medicine categories with counts
+router.get('/categories', async (req, res) => {
+  try {
+    const categories = await Medicine.getCategories();
+    res.json({ success: true, categories });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get medicines by category
+router.get('/category/:category', async (req, res) => {
+  try {
+    const medicines = await Medicine.findByCategory(req.params.category);
+    res.json({ success: true, count: medicines.length, medicines });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Find cheaper alternatives for a medicine
+router.get('/alternatives/:name', async (req, res) => {
+  try {
+    const alternatives = await Medicine.findAlternatives(req.params.name);
+    res.json({
+      success: true,
+      original: req.params.name,
+      count: alternatives.length,
+      alternatives,
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

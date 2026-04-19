@@ -8,6 +8,7 @@ import {
   Package, X, Loader2, ChevronRight, Building2, Search, Filter, Database
 } from 'lucide-react';
 import RazorpayCheckout from '@/components/RazorpayCheckout';
+import HealthcareCTA from '@/components/HealthcareCTA';
 
 // ——— Types ———
 interface NearbyPharmacy {
@@ -670,6 +671,13 @@ export default function Medicines() {
                 </div>
               )}
             </div>
+
+            {/* Healthcare CTA — Loan & Nearby Hospitals */}
+            <HealthcareCTA
+              context="Need help covering medicine costs?"
+              condition="pharmacy"
+              variant="compact"
+            />
          </div>
       </div>
 

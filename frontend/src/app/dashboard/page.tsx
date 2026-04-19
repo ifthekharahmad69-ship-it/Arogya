@@ -12,6 +12,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useUser } from '@clerk/nextjs';
 import DiagnosticServices from '@/components/DiagnosticServices';
 import Testimonials from '@/components/Testimonials';
+import HealthcareCTA from '@/components/HealthcareCTA';
 
 export default function Dashboard() {
   const { location, loading: locLoading } = useLocation();
@@ -272,6 +273,12 @@ export default function Dashboard() {
 
       {/* Diagnostic Services */}
       <DiagnosticServices />
+
+      {/* Healthcare CTA — Loan & Nearby Hospitals */}
+      <HealthcareCTA
+        context="Explore financial options or find hospitals for your healthcare needs"
+        variant="wide"
+      />
 
       {/* Testimonials */}
       <Testimonials />

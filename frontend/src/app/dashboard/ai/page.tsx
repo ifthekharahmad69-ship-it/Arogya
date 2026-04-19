@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Paperclip, MoreVertical, Sparkles, Activity, Loader2, Trash2 } from 'lucide-react';
 import { useUser } from '@clerk/nextjs';
+import HealthcareCTA from '@/components/HealthcareCTA';
 
 interface Message {
   id: number;
@@ -212,6 +213,13 @@ export default function AIAssistant() {
          ))}
          <div ref={chatEndRef} />
       </div>
+
+      {/* Healthcare CTA — Loan & Nearby Hospitals */}
+      {messages.length > 3 && (
+        <div className="px-4 pt-3 pb-0 z-10 border-t border-emerald-100 bg-emerald-50/30">
+          <HealthcareCTA variant="compact" context="Need treatment? Explore financial options or find hospitals" />
+        </div>
+      )}
 
       {/* Input Area */}
       <div className="p-4 bg-white border-t border-slate-100 z-10">

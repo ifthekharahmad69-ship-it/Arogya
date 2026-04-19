@@ -6,6 +6,7 @@ import {
   ChevronRight, Loader2, ArrowLeft, CheckCircle2, TrendingUp,
   Droplets, Wind, Bone, Pill, Target, Zap, ThermometerSun
 } from 'lucide-react';
+import HealthcareCTA from '@/components/HealthcareCTA';
 
 const PREDICTORS = [
   { id: 'diabetes-heart', label: 'Diabetes & Heart', icon: Heart, color: 'from-rose-500 to-red-600', bg: 'bg-rose-50', text: 'text-rose-600', emoji: '🩸' },
@@ -256,6 +257,13 @@ export default function PredictorsPage() {
             It is NOT a medical diagnosis. Always consult a qualified healthcare professional for medical advice.
           </p>
         </div>
+
+        {/* Healthcare CTA — Loan & Nearby Hospitals */}
+        <HealthcareCTA
+          context={`Based on your ${result.riskLevel} risk ${currentPredictor.label} assessment`}
+          condition={currentPredictor.label}
+          variant="wide"
+        />
       </div>
     );
   }

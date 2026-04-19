@@ -91,6 +91,7 @@ const emergencyRoutes = require('./routes/emergency');
 const bloodDonorRoutes = require('./routes/bloodDonors');
 const chatRoutes = require('./routes/chat');
 const orderRoutes = require('./routes/orders');
+const healthRoutes = require('./routes/health');
 
 
 const mediaRoutes = require('./routes/media');
@@ -108,6 +109,7 @@ app.use('/api/emergency', emergencyRoutes);
 app.use('/api/blood-donors', bloodDonorRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/health', healthRoutes);
 
 
 app.use('/api/media', mediaRoutes);

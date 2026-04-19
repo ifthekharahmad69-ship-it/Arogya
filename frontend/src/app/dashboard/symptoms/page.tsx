@@ -6,6 +6,7 @@ import {
   Pill, Clock, ShieldAlert, ChevronRight, Info, Search,
   Thermometer, X, CheckCircle2, Syringe, Droplets
 } from 'lucide-react';
+import HealthcareCTA from '@/components/HealthcareCTA';
 
 interface Medicine {
   name: string;
@@ -454,6 +455,12 @@ export default function SymptomChecker() {
                   {result.disclaimer || 'This is AI-generated advice. Always consult a qualified doctor.'}
                 </p>
               </div>
+
+              {/* Healthcare CTA — Loan & Nearby Hospitals */}
+              <HealthcareCTA
+                context={`Based on your ${result.severity} ${result.diagnosis} diagnosis`}
+                condition={result.diagnosis}
+              />
             </div>
           )}
         </div>

@@ -42,6 +42,7 @@ const ROUTE_MAP = {
   "medicines": "/dashboard/medicines",
   "scanner": "/dashboard/scanner",
   "hospitals": "/dashboard/hospitals",
+  "healthcare_navigator": "/dashboard/healthcare-navigator",
   "reports": "/dashboard/reports",
   "quiz": "/dashboard/quiz",
   "appointments": "/dashboard/appointments",
@@ -143,6 +144,7 @@ export const AGENT_TOOLS = [
               "medicines",
               "scanner",
               "hospitals",
+              "healthcare_navigator",
               "reports",
               "quiz",
               "appointments",
@@ -368,6 +370,7 @@ APP PAGES YOU CAN NAVIGATE TO:
 - medicines → Medicine Finder
 - scanner → Medicine Scanner
 - hospitals → Nearby Hospitals
+- healthcare_navigator → Healthcare Navigator (AI-powered hospital discovery & cost estimation)
 - reports → Medical Reports
 - quiz → Health Quiz / Tracker
 - appointments → Appointments

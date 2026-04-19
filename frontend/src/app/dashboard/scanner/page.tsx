@@ -7,6 +7,7 @@ import {
   CheckCircle2, Info, ChevronRight, ScanLine, ImageIcon,
   RotateCcw, Stethoscope, FileWarning
 } from 'lucide-react';
+import HealthcareCTA from '@/components/HealthcareCTA';
 
 interface ScanResult {
   identified: boolean;
@@ -443,6 +444,12 @@ export default function MedicineScanner() {
                   AI-generated analysis. Verify with a pharmacist or doctor for accuracy.
                 </p>
               </div>
+
+              {/* Healthcare CTA — Loan & Nearby Hospitals */}
+              <HealthcareCTA
+                context={`For your scanned medicine: ${result.medicineName}`}
+                condition={result.category}
+              />
             </div>
           )}
         </div>
