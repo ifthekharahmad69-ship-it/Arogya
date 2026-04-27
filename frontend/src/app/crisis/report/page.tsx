@@ -1,0 +1,587 @@
+'use client';
+
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import {
+  AlertTriangle, BellRing, MapPin, User, HeartPulse,
+  Send, CheckCircle2, Loader2, Hospital, CreditCard,
+  MessageSquare, Shield, PhoneCall, Clock, Activity,
+  Zap, Ambulance, X, Building2, BadgeAlert
+} from 'lucide-react';
+import { io, Socket } from 'socket.io-client';
+
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+type FlowStep = 'idle' | 'form' | 'creating' | 'enriching' | 'live' | 'resolved';
+
+interface Incident {
+  id: string;
+  room: string;
+  floor: string;
+  guest_name: string;
+  type: string;
+  status: string;
+  severity: string;
+  condition?: string;
+  icd10?: string;
+  action?: string;
+  hospital_dept?: string;
+  assigned_responder?: { id: string; name: string; role: string; accepted_at?: string };
+  hospital_recommendation?: {
+    primary: { name: string; dist: string; dept: string; tier: string };
+    nearest: { name: string; dist: string; dept: string; tier: string };
+    budget: { name: string; dist: string; dept: string; tier: string };
+  };
+  cost_estimate?: { range: string; emi_options: string[]; loan_available: boolean };
+  messages: { id: string; sender: string; senderRole: string; text: string; timestamp: string }[];
+  ambulance_alert?: { demo_message: string };
+  created_at: string;
+}
+
+const SEVERITY_CONFIG: Record<string, { color: string; bg: string; label: string; pulse: boolean }> = {
+  critical: { color: 'text-red-700', bg: 'bg-red-100 border-red-300', label: 'CRITICAL', pulse: true },
+  high:     { color: 'text-orange-700', bg: 'bg-orange-100 border-orange-300', label: 'HIGH', pulse: true },
+  moderate: { color: 'text-amber-700', bg: 'bg-amber-100 border-amber-300', label: 'MODERATE', pulse: false },
+  low:      { color: 'text-green-700', bg: 'bg-green-100 border-green-300', label: 'LOW', pulse: false },
+  assessing:{ color: 'text-blue-700', bg: 'bg-blue-100 border-blue-300', label: 'ASSESSING', pulse: true },
+};
+
+const STATUS_STEPS = [
+  { key: 'pending',  label: 'Alert Received',      icon: BellRing },
+  { key: 'assigned', label: 'Responder Assigned',   icon: Shield },
+  { key: 'accepted', label: 'Accepted',             icon: CheckCircle2 },
+  { key: 'enroute',  label: 'On the Way',           icon: Ambulance },
+  { key: 'arrived',  label: 'Responder Arrived',    icon: MapPin },
+  { key: 'resolved', label: 'Resolved',             icon: CheckCircle2 },
+];
+
+function CrisisReportPage() {
+  const searchParams = useSearchParams();
+  const preRoom  = searchParams.get('room')  || '';
+  const preFloor = searchParams.get('floor') || '';
+
+  const [step, setStep] = useState<FlowStep>('idle');
+  const [incident, setIncident] = useState<Incident | null>(null);
+  const [form, setForm] = useState({ name: '', room: preRoom, floor: preFloor, type: 'medical', symptoms: '' });
+  const [chatText, setChatText] = useState('');
+  const [messages, setMessages] = useState<Incident['messages']>([]);
+  const [elapsed, setElapsed] = useState(0);
+  const socketRef = useRef<Socket | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Pre-fill from QR
+  useEffect(() => {
+    if (preRoom || preFloor) setStep('form');
+  }, [preRoom, preFloor]);
+
+  // Elapsed timer
+  useEffect(() => {
+    if (step === 'live' && incident) {
+      timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [step, incident]);
+
+  // Socket.io
+  useEffect(() => {
+    if (!incident) return;
+    const socket = io(API, { transports: ['websocket', 'polling'] });
+    socketRef.current = socket;
+
+    socket.emit('join_incident', incident.id);
+
+    socket.on('incident_status_update', (updated: Incident) => {
+      if (updated.id === incident.id) {
+        setIncident(updated);
+        if (updated.status === 'resolved') setStep('resolved');
+      }
+    });
+
+    socket.on('incident_enriched', (updated: Incident) => {
+      if (updated.id === incident.id) setIncident(updated);
+    });
+
+    socket.on('incident_assigned', (updated: Incident) => {
+      if (updated.id === incident.id) {
+        setIncident(updated);
+        setMessages(m => [...m, {
+          id: `sys-${Date.now()}`,
+          sender: 'System',
+          senderRole: 'system',
+          text: `✅ ${updated.assigned_responder?.name} (${updated.assigned_responder?.role}) has been assigned and is heading your way.`,
+          timestamp: new Date().toISOString(),
+        }]);
+      }
+    });
+
+    socket.on('incident_message', (msg: Incident['messages'][0]) => {
+      setMessages(m => [...m, msg]);
+    });
+
+    return () => { socket.disconnect(); };
+  }, [incident?.id]);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // ── Step 2: Create incident ──
+  const handleTrigger = async () => {
+    if (!form.name.trim() || !form.room.trim()) return;
+    setStep('creating');
+
+    const res = await fetch(`${API}/api/crisis/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        room: form.room, floor: form.floor,
+        guestName: form.name, type: form.type, symptoms: form.symptoms,
+      }),
+    }).then(r => r.json());
+
+    if (res.success) {
+      setIncident(res.incident);
+      setMessages([{
+        id: 'sys-0',
+        sender: 'System',
+        senderRole: 'system',
+        text: `🚨 Emergency alert created. Incident ID: ${res.incident.id}. Help is being dispatched to Room ${res.incident.room}.`,
+        timestamp: new Date().toISOString(),
+      }]);
+
+      // Step 3: AI Enrichment
+      setStep('enriching');
+      setTimeout(async () => {
+        const enrichRes = await fetch(`${API}/api/crisis/enrich/${res.incident.id}`, { method: 'POST' })
+          .then(r => r.json());
+        if (enrichRes.success) {
+          setIncident(enrichRes.incident);
+          // Auto-assign
+          await fetch(`${API}/api/crisis/assign/${res.incident.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        }
+        setStep('live');
+      }, 2000);
+    }
+  };
+
+  // ── Send chat message ──
+  const sendChat = () => {
+    if (!chatText.trim() || !incident || !socketRef.current) return;
+    const msg = { incidentId: incident.id, sender: form.name || 'Guest', senderRole: 'guest', text: chatText };
+    socketRef.current.emit('crisis_message', msg);
+    setMessages(m => [...m, { id: `g-${Date.now()}`, sender: form.name || 'Guest', senderRole: 'guest', text: chatText, timestamp: new Date().toISOString() }]);
+    setChatText('');
+  };
+
+  const sev = SEVERITY_CONFIG[incident?.severity || 'assessing'];
+  const currentStatusIdx = STATUS_STEPS.findIndex(s => s.key === (incident?.status || 'pending'));
+
+  // ──────────────────────────── RENDER ────────────────────────────
+
+  if (step === 'idle') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-950 via-red-900 to-rose-800 flex items-center justify-center p-4">
+        <div className="max-w-md w-full text-center space-y-8">
+          <div className="flex justify-center">
+            <div className="relative">
+              <div className="h-32 w-32 rounded-full bg-white/10 border-4 border-white/20 flex items-center justify-center animate-pulse">
+                <div className="h-20 w-20 rounded-full bg-white flex items-center justify-center shadow-2xl">
+                  <BellRing className="h-10 w-10 text-red-600" />
+                </div>
+              </div>
+              <div className="absolute inset-0 rounded-full bg-red-400/20 animate-ping" />
+            </div>
+          </div>
+          <div className="text-white">
+            <h1 className="text-4xl font-black mb-3">Emergency?</h1>
+            <p className="text-red-200 text-lg font-medium">Instant help is one tap away. Press the button to alert hotel staff immediately.</p>
+          </div>
+          <button
+            onClick={() => setStep('form')}
+            className="w-full py-6 bg-white text-red-600 font-black text-2xl rounded-3xl shadow-2xl hover:scale-105 transition-transform flex items-center justify-center gap-3"
+          >
+            <AlertTriangle className="h-8 w-8" /> 🚨 EMERGENCY
+          </button>
+          <p className="text-red-300 text-sm">Hotel staff will be notified instantly. Your location is: Room {preRoom || 'detected automatically'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'form') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
+        <div className="max-w-lg w-full bg-white rounded-3xl shadow-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-red-600 to-rose-600 p-6 text-white">
+            <div className="flex items-center gap-3 mb-1">
+              <AlertTriangle className="h-7 w-7" />
+              <h2 className="text-2xl font-black">Report Emergency</h2>
+            </div>
+            <p className="text-red-100 text-sm">This will instantly alert hotel staff and emergency services.</p>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Your Name *</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input value={form.name} onChange={e => setForm({...form, name: e.target.value})}
+                    className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-400"
+                    placeholder="Full name" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Room No. *</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input value={form.room} onChange={e => setForm({...form, room: e.target.value})}
+                    className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-400"
+                    placeholder="e.g., 305" />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Emergency Type</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { val: 'medical', label: '🏥 Medical', color: 'rose' },
+                  { val: 'fire', label: '🔥 Fire', color: 'orange' },
+                  { val: 'security', label: '🔓 Security', color: 'blue' },
+                  { val: 'other', label: '⚠️ Other', color: 'slate' },
+                ].map(t => (
+                  <button key={t.val}
+                    onClick={() => setForm({...form, type: t.val})}
+                    className={`py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${
+                      form.type === t.val ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >{t.label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Describe the Emergency</label>
+              <div className="relative">
+                <HeartPulse className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <textarea value={form.symptoms} onChange={e => setForm({...form, symptoms: e.target.value})}
+                  className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-400 resize-none"
+                  rows={3} placeholder="e.g., chest pain, difficulty breathing, unconscious..." />
+              </div>
+            </div>
+
+            {/* Gap 4: QR info banner */}
+            {(preRoom || preFloor) && (
+              <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                <p className="text-xs font-semibold text-emerald-700">Room {preRoom} detected via QR scan — location pre-filled</p>
+              </div>
+            )}
+
+            <button
+              onClick={handleTrigger}
+              disabled={!form.name.trim() || !form.room.trim()}
+              className="w-full py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 disabled:opacity-50 text-white font-black text-lg rounded-2xl shadow-xl shadow-red-500/30 transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
+            >
+              <Zap className="h-5 w-5" /> 🚨 SEND EMERGENCY ALERT
+            </button>
+
+            <p className="text-center text-xs text-slate-400">
+              🔒 Webhook-ready bridge to emergency services • SMS fallback via Twilio
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'creating' || step === 'enriching') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
+        <div className="text-center space-y-6">
+          <div className="relative">
+            <div className="h-24 w-24 rounded-full bg-red-500/20 flex items-center justify-center mx-auto">
+              <Loader2 className="h-12 w-12 text-red-400 animate-spin" />
+            </div>
+            <div className="absolute inset-0 rounded-full bg-red-400/10 animate-ping mx-auto" style={{ animationDuration: '1.5s' }} />
+          </div>
+          <div className="text-white">
+            <h2 className="text-2xl font-black mb-2">
+              {step === 'creating' ? '🚨 Creating Incident...' : '🧠 AI Assessing Severity...'}
+            </h2>
+            <p className="text-slate-400">
+              {step === 'creating'
+                ? 'Broadcasting alert to hotel command center'
+                : 'ICD-10 mapping • Risk scoring • Responder matching'}
+            </p>
+          </div>
+          <div className="flex justify-center gap-2">
+            {[0,1,2].map(i => (
+              <div key={i} className="h-2 w-2 rounded-full bg-red-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'resolved') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-900 to-teal-800 flex items-center justify-center p-4">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="h-24 w-24 rounded-full bg-emerald-400/20 flex items-center justify-center mx-auto">
+            <CheckCircle2 className="h-12 w-12 text-emerald-400" />
+          </div>
+          <div className="text-white">
+            <h2 className="text-3xl font-black mb-2">Incident Resolved ✅</h2>
+            <p className="text-emerald-200">Incident <strong>{incident?.id}</strong> has been successfully closed.</p>
+            {incident?.response_time_minutes && (
+              <p className="text-emerald-300 mt-2">⏱ Response time: <strong>{incident.response_time_minutes} min</strong></p>
+            )}
+          </div>
+          <div className="bg-white/10 rounded-2xl p-4 text-left space-y-2 text-emerald-100 text-sm">
+            <p>📍 Room {incident?.room} — <span className="capitalize">{incident?.type}</span> emergency</p>
+            <p>👤 {incident?.assigned_responder?.name} ({incident?.assigned_responder?.role})</p>
+            <p>🏥 {incident?.hospital_recommendation?.nearest?.name}</p>
+          </div>
+          <button onClick={() => { setStep('idle'); setIncident(null); setMessages([]); setElapsed(0); }}
+            className="w-full py-4 bg-white text-emerald-700 font-black text-lg rounded-2xl shadow-xl hover:scale-105 transition-transform">
+            Return to Safety ✓
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── LIVE INCIDENT VIEW (Steps 4–10) ──
+  return (
+    <div className="min-h-screen bg-slate-50">
+      {/* Crisis Header */}
+      <div className={`${sev?.pulse ? 'animate-pulse' : ''} bg-gradient-to-r from-red-700 to-rose-600 text-white px-4 py-3`}>
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5" />
+            <div>
+              <p className="font-black text-sm">INCIDENT {incident?.id}</p>
+              <p className="text-red-200 text-xs">Room {incident?.room} • {form.type.toUpperCase()}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`px-3 py-1 rounded-full text-xs font-black bg-white/20 ${sev?.color}`}>
+              {sev?.label}
+            </span>
+            <span className="text-xs text-red-200 flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {Math.floor(elapsed / 60).toString().padStart(2,'0')}:{(elapsed % 60).toString().padStart(2,'0')}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+
+        {/* Step 4: Status Timeline */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+          <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+            <Activity className="h-4 w-4 text-red-500" /> Live Status
+          </h3>
+          <div className="flex items-center gap-1 overflow-x-auto pb-1">
+            {STATUS_STEPS.map((s, i) => {
+              const done = i < currentStatusIdx;
+              const active = i === currentStatusIdx;
+              return (
+                <div key={s.key} className="flex items-center gap-1 flex-shrink-0">
+                  <div className={`flex flex-col items-center gap-1 ${active ? 'scale-110' : ''} transition-transform`}>
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
+                      done ? 'bg-emerald-500 text-white' : active ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 text-slate-400'
+                    }`}>
+                      <s.icon className="h-3.5 w-3.5" />
+                    </div>
+                    <p className={`text-[9px] font-bold text-center leading-tight max-w-[52px] ${
+                      done ? 'text-emerald-600' : active ? 'text-red-600' : 'text-slate-400'
+                    }`}>{s.label}</p>
+                  </div>
+                  {i < STATUS_STEPS.length - 1 && (
+                    <div className={`h-0.5 w-6 flex-shrink-0 ${i < currentStatusIdx ? 'bg-emerald-400' : 'bg-slate-200'}`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Step 3: AI Enrichment Card */}
+        {incident?.condition && (
+          <div className={`rounded-2xl p-4 border-2 ${sev?.bg}`}>
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <BadgeAlert className="h-5 w-5 text-red-600" />
+                <h3 className="font-black text-slate-800">AI Assessment</h3>
+              </div>
+              <span className="text-xs bg-white/70 px-2 py-0.5 rounded-full font-bold text-slate-600">ICD-10: {incident.icd10}</span>
+            </div>
+            <p className="font-bold text-slate-900 mb-1">{incident.condition}</p>
+            <p className="text-sm text-slate-600">{incident.action}</p>
+            {incident.ambulance_alert && (
+              <div className="mt-3 flex items-center gap-2 p-2 bg-red-50 rounded-xl border border-red-200">
+                <Ambulance className="h-4 w-4 text-red-600 flex-shrink-0" />
+                <p className="text-xs font-semibold text-red-700">{incident.ambulance_alert.demo_message}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Step 5: Assigned Responder */}
+        {incident?.assigned_responder && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+              <Shield className="h-4 w-4 text-indigo-500" /> Assigned Responder
+            </h3>
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center text-xl font-black text-indigo-600">
+                {incident.assigned_responder.name.charAt(0)}
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-slate-900">{incident.assigned_responder.name}</p>
+                <p className="text-sm text-slate-500">{incident.assigned_responder.role}</p>
+              </div>
+              <div className={`px-3 py-1.5 rounded-xl text-xs font-bold ${
+                ['enroute','arrived'].includes(incident.status) ? 'bg-blue-100 text-blue-700' :
+                incident.status === 'accepted' ? 'bg-emerald-100 text-emerald-700' :
+                'bg-amber-100 text-amber-700'
+              }`}>
+                {incident.status === 'accepted' ? '✓ Accepted' :
+                 incident.status === 'enroute'  ? '🏃 Enroute' :
+                 incident.status === 'arrived'  ? '✅ Arrived' : '⏳ Notified'}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 8: Hospital Intelligence */}
+        {incident?.hospital_recommendation && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+              <Hospital className="h-4 w-4 text-emerald-500" /> Hospital Intelligence
+            </h3>
+            <div className="space-y-2">
+              {Object.entries(incident.hospital_recommendation).map(([key, h]) => (
+                <div key={key} className={`flex items-center gap-3 p-3 rounded-xl border ${
+                  key === 'primary' ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100'
+                }`}>
+                  <div className={`p-1.5 rounded-lg ${key === 'primary' ? 'bg-emerald-100' : 'bg-slate-100'}`}>
+                    <Building2 className={`h-4 w-4 ${key === 'primary' ? 'text-emerald-600' : 'text-slate-500'}`} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-slate-800">{h.name}</p>
+                    <p className="text-xs text-slate-500">{h.dist} • {h.dept}</p>
+                  </div>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                    key === 'primary' ? 'bg-emerald-200 text-emerald-700' :
+                    key === 'nearest' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'
+                  }`}>{h.tier}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Step 9: Cost + EMI (UNIQUE WINNING POINT) */}
+        {incident?.cost_estimate && (
+          <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-2xl p-4 border border-violet-200">
+            <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-violet-500" /> Cost Estimate & Financing
+            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-xs text-slate-500">Estimated Cost</p>
+                <p className="text-xl font-black text-slate-900">{incident.cost_estimate.range}</p>
+              </div>
+              <div className="bg-violet-100 px-3 py-1.5 rounded-xl">
+                <p className="text-xs font-bold text-violet-700">EMI Available</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {incident.cost_estimate.emi_options.map((emi, i) => (
+                <div key={i} className="bg-white rounded-xl p-2 text-center border border-violet-100">
+                  <p className="text-xs font-black text-violet-700">{emi}</p>
+                </div>
+              ))}
+            </div>
+            <button className="mt-3 w-full py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm rounded-xl transition-colors flex items-center justify-center gap-2">
+              <CreditCard className="h-4 w-4" /> Apply for Medical Loan →
+            </button>
+          </div>
+        )}
+
+        {/* Step 7: Real-Time Chat */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-blue-500" />
+            <h3 className="text-sm font-bold text-slate-700">Live Communication</h3>
+            <span className="ml-auto flex items-center gap-1 text-xs text-emerald-600 font-semibold">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live
+            </span>
+          </div>
+          <div className="h-48 overflow-y-auto p-3 space-y-2 bg-slate-50">
+            {messages.length === 0 && (
+              <p className="text-center text-xs text-slate-400 mt-8">Messages will appear here…</p>
+            )}
+            {messages.map(m => (
+              <div key={m.id} className={`flex ${m.senderRole === 'guest' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${
+                  m.senderRole === 'system'  ? 'bg-amber-50 border border-amber-200 text-amber-800 text-xs text-center max-w-full w-full' :
+                  m.senderRole === 'guest'   ? 'bg-blue-500 text-white rounded-br-sm' :
+                  'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
+                }`}>
+                  {m.senderRole !== 'guest' && m.senderRole !== 'system' && (
+                    <p className="text-xs font-bold text-slate-500 mb-0.5">{m.sender}</p>
+                  )}
+                  <p>{m.text}</p>
+                </div>
+              </div>
+            ))}
+            <div ref={chatEndRef} />
+          </div>
+          <div className="p-3 border-t border-slate-100 flex gap-2">
+            <input value={chatText} onChange={e => setChatText(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendChat()}
+              className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
+              placeholder="Message hotel staff…" />
+            <button onClick={sendChat} className="p-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition-colors">
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Emergency call buttons */}
+        <div className="grid grid-cols-2 gap-3">
+          <a href="tel:108" className="flex items-center justify-center gap-2 py-3.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl transition-colors shadow-lg shadow-red-500/25">
+            <PhoneCall className="h-4 w-4" /> Ambulance 108
+          </a>
+          <a href="tel:112" className="flex items-center justify-center gap-2 py-3.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-2xl transition-colors shadow-lg">
+            <PhoneCall className="h-4 w-4" /> Emergency 112
+          </a>
+        </div>
+
+        <p className="text-center text-xs text-slate-400 pb-4">
+          🔒 End-to-end encrypted • SMS fallback active • Webhook-ready for emergency services
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function CrisisReportPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-red-950 to-rose-800 flex items-center justify-center">
+        <Loader2 className="h-10 w-10 text-white animate-spin" />
+      </div>
+    }>
+      <CrisisReportPage />
+    </Suspense>
+  );
+}

@@ -43,7 +43,36 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* ── CRISIS COMMAND CENTER BANNER ── */}
+      <div className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 rounded-2xl p-5 border border-red-500/30 shadow-xl shadow-red-500/20 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.1),transparent)]" />
+        <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-3xl" />
+        <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center flex-shrink-0">
+              <AlertCircle className="h-6 w-6 text-white animate-pulse" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-red-200 uppercase tracking-wider mb-0.5">New Feature</p>
+              <h2 className="text-xl font-extrabold text-white">Crisis Command Center</h2>
+              <p className="text-red-100 text-sm">Real-time emergency coordination for hospitality environments</p>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <Link href="/crisis/report" target="_blank"
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-white/15 hover:bg-white/25 border border-white/20 text-white font-bold text-sm rounded-xl transition-all">
+              🚨 Guest SOS
+            </Link>
+            <Link href="/dashboard/crisis"
+              className="flex items-center gap-2 px-5 py-2.5 bg-white text-red-600 font-black text-sm rounded-xl shadow-lg hover:scale-105 transition-transform">
+              <ChevronRight className="h-4 w-4" /> Open Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+
       {/* 3-Column Grid */}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 w-full">
 
         {/* ==================== LEFT COLUMN ==================== */}

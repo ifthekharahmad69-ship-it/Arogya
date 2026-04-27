@@ -12,6 +12,7 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
+const ioInstance = require('./ioInstance');
 
 // Gzip compression — reduces response sizes by 60-80%
 app.use(compression());
@@ -29,6 +30,8 @@ const io = new Server(httpServer, {
     methods: ['GET', 'POST'],
   },
 });
+// Register io singleton immediately so routes can access it
+ioInstance.setIo(io);
 
 // Security middleware
 app.use(helmet());
@@ -96,6 +99,7 @@ const healthRoutes = require('./routes/health');
 
 const mediaRoutes = require('./routes/media');
 const doctorProfileRoutes = require('./routes/doctorProfiles');
+const crisisRoutes = require('./routes/crisis');
 
 // Register routes
 app.use('/api/auth', authRoutes);
@@ -114,6 +118,7 @@ app.use('/api/health', healthRoutes);
 
 app.use('/api/media', mediaRoutes);
 app.use('/api/doctor-profiles', doctorProfileRoutes);
+app.use('/api/crisis', crisisRoutes);
 
 // Health check
 const { redisHealth } = require('./services/redisService');

@@ -48,6 +48,40 @@ module.exports = function (io) {
       socket.to(data.chatId).emit('user_stop_typing', data);
     });
 
+    // ── Crisis Coordination Rooms ──
+    socket.on('join_incident', (incidentId) => {
+      socket.join(`incident_${incidentId}`);
+      console.log(`Socket ${socket.id} joined incident room: incident_${incidentId}`);
+    });
+
+    socket.on('leave_incident', (incidentId) => {
+      socket.leave(`incident_${incidentId}`);
+    });
+
+    // Responder joins their personal alert channel
+    socket.on('responder_online', (responderId) => {
+      socket.join(`responder_${responderId}`);
+      console.log(`Responder ${responderId} online`);
+    });
+
+    // Crisis chat message via socket (real-time relay)
+    socket.on('crisis_message', (data) => {
+      const { incidentId, sender, senderRole, text } = data;
+      const message = {
+        id: `MSG${Date.now()}`,
+        sender,
+        senderRole,
+        text,
+        timestamp: new Date().toISOString(),
+      };
+      io.to(`incident_${incidentId}`).emit('incident_message', message);
+    });
+
+    // Responder accepts / updates status
+    socket.on('crisis_status_update', (data) => {
+      io.emit('incident_status_update', data);
+    });
+
     // WebRTC signaling
     socket.on('call_user', (data) => {
       const targetSocket = onlineUsers.get(data.targetId);
