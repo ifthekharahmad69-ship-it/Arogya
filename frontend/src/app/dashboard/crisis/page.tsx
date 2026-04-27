@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   AlertTriangle, Shield, CheckCircle2, Clock, MapPin,
   User, BellRing, Ambulance, Hospital, CreditCard,
   MessageSquare, Send, Activity, RefreshCw, BadgeAlert,
   Building2, Zap, PhoneCall, X, ChevronDown, ChevronUp,
-  Radio, BarChart3, Users, TrendingUp
+  Radio, BarChart3, Users, TrendingUp, QrCode
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -222,8 +223,11 @@ export default function CrisisDashboard() {
           <button onClick={fetchAll} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
             <RefreshCw className="h-4 w-4" /> Refresh
           </button>
+          <Link href="/dashboard/crisis/qr" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg shadow-indigo-500/25">
+            <QrCode className="h-4 w-4" /> QR Codes
+          </Link>
           <a href="/crisis/report" target="_blank" className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg shadow-red-500/25">
-            <AlertTriangle className="h-4 w-4" /> Guest SOS Page
+            <AlertTriangle className="h-4 w-4" /> Guest SOS
           </a>
         </div>
       </header>
