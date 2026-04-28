@@ -2,13 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
+import { createClient } from '@supabase/supabase-js';
 import {
   User, Heart, Pill, AlertTriangle, Phone, Hospital,
   Shield, Save, CheckCircle2, Edit2, Activity, Droplets,
   Weight, Ruler, Calendar, Lock, BadgeAlert, Plus, X, Loader2
 } from 'lucide-react';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+// Direct Supabase client (bypasses backend — works even when backend is offline)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+);
 
 const CONDITION_OPTIONS = [
   'Diabetes (Type 1)', 'Diabetes (Type 2)', 'Hypertension', 'Heart Disease',
@@ -94,53 +99,76 @@ export default function MedicalProfilePage() {
   const [saved, setSaved] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
 
-  // Load existing profile
+  // Load existing profile — direct from Supabase
   useEffect(() => {
     if (!isLoaded || !user) return;
-    fetch(`${API}/api/medical-profile`, {
-      headers: { 'x-user-id': user.id },
-    }).then(r => r.json()).then(res => {
-      if (res.success && res.profile) {
-        setProfile({
-          ...res.profile,
-          age: res.profile.age?.toString() || '',
-          height_cm: res.profile.height_cm?.toString() || '',
-          weight_kg: res.profile.weight_kg?.toString() || '',
-          bp_systolic: res.profile.bp_systolic?.toString() || '',
-          bp_diastolic: res.profile.bp_diastolic?.toString() || '',
-          sugar_level_fasting: res.profile.sugar_level_fasting?.toString() || '',
-          sugar_level_pp: res.profile.sugar_level_pp?.toString() || '',
-          pulse_rate: res.profile.pulse_rate?.toString() || '',
-          conditions: res.profile.conditions || [],
-          current_medications: res.profile.current_medications || [],
-          allergies: res.profile.allergies || [],
-          preferred_hospitals: res.profile.preferred_hospitals || [],
-        });
-        setHasProfile(true);
-      }
-    }).catch(console.warn)
+    supabase
+      .from('user_medical_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data, error }) => {
+        // PGRST116 = no rows found (first time user)
+        if (error && error.code !== 'PGRST116') {
+          console.warn('[Profile] Load error:', error.message);
+          return;
+        }
+        if (data) {
+          setProfile({
+            ...data,
+            age: data.age?.toString() || '',
+            height_cm: data.height_cm?.toString() || '',
+            weight_kg: data.weight_kg?.toString() || '',
+            bp_systolic: data.bp_systolic?.toString() || '',
+            bp_diastolic: data.bp_diastolic?.toString() || '',
+            sugar_level_fasting: data.sugar_level_fasting?.toString() || '',
+            sugar_level_pp: data.sugar_level_pp?.toString() || '',
+            pulse_rate: data.pulse_rate?.toString() || '',
+            conditions: data.conditions || [],
+            current_medications: data.current_medications || [],
+            allergies: data.allergies || [],
+            preferred_hospitals: data.preferred_hospitals || [],
+          });
+          setHasProfile(true);
+        }
+      })
       .finally(() => setIsLoading(false));
   }, [isLoaded, user]);
 
   const set = (key: keyof Profile, value: unknown) =>
     setProfile(p => ({ ...p, [key]: value }));
 
+  // Save profile — direct upsert to Supabase
   const save = async () => {
     if (!user) return;
     setIsSaving(true);
     try {
-      const res = await fetch(`${API}/api/medical-profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
-        body: JSON.stringify(profile),
-      }).then(r => r.json());
-      if (res.success) {
-        setSaved(true);
-        setHasProfile(true);
-        setTimeout(() => setSaved(false), 3000);
-      }
-    } catch (e) { console.error(e); }
-    finally { setIsSaving(false); }
+      const profileData = {
+        user_id: user.id,
+        ...profile,
+        age: profile.age ? Number(profile.age) : null,
+        height_cm: profile.height_cm ? Number(profile.height_cm) : null,
+        weight_kg: profile.weight_kg ? Number(profile.weight_kg) : null,
+        bp_systolic: profile.bp_systolic ? Number(profile.bp_systolic) : null,
+        bp_diastolic: profile.bp_diastolic ? Number(profile.bp_diastolic) : null,
+        sugar_level_fasting: profile.sugar_level_fasting ? Number(profile.sugar_level_fasting) : null,
+        sugar_level_pp: profile.sugar_level_pp ? Number(profile.sugar_level_pp) : null,
+        pulse_rate: profile.pulse_rate ? Number(profile.pulse_rate) : null,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await supabase
+        .from('user_medical_profiles')
+        .upsert(profileData, { onConflict: 'user_id' });
+      if (error) throw error;
+      setSaved(true);
+      setHasProfile(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e: any) {
+      console.error('[Profile] Save error:', e.message);
+      alert('Save failed: ' + e.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!isLoaded || isLoading) {
