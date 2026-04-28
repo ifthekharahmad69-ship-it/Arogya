@@ -8,6 +8,7 @@ import {
   Heart, Stethoscope, ClipboardList, RefreshCw, Radio,
   ArrowRight, BadgeAlert, Building2, Shield, ChevronRight
 } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 const HOSPITAL_ID = 'apollo_emergency';
@@ -58,6 +59,7 @@ const STATUS_FLOW: Record<string, { label: string; color: string; next: string |
 };
 
 export default function HospitalPortal() {
+  const { t } = useLanguage();
   const [notifications, setNotifications] = useState<PatientNotification[]>([]);
   const [selected, setSelected] = useState<PatientNotification | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -212,10 +214,10 @@ export default function HospitalPortal() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
 
         {/* KPI stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 sm:mb-6">
           {[
             { label: 'Incoming Alerts',  value: notifications.length, icon: AlertTriangle, color: 'rose'    },
             { label: 'Awaiting Action',  value: pendingCount,          icon: Radio,         color: 'orange'  },
@@ -238,11 +240,11 @@ export default function HospitalPortal() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="flex flex-col xl:grid xl:grid-cols-3 gap-4 sm:gap-6">
 
           {/* ── LEFT: Incoming Patient List ── */}
           <div className="xl:col-span-1 space-y-3">
-            <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Incoming Patients</h2>
+            <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">{t('incomingPatients') || 'Incoming Patients'}</h2>
 
             {isLoading ? (
               <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-24 bg-slate-100 rounded-2xl animate-pulse" />)}</div>
@@ -253,7 +255,7 @@ export default function HospitalPortal() {
                 <p className="text-xs text-slate-400 mt-1">Alerts appear here instantly when a hotel triggers SOS</p>
               </div>
             ) : (
-              <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[40vh] xl:max-h-[65vh] overflow-y-auto pr-1">
                 {notifications.map(n => {
                   const st = STATUS_FLOW[n.status] || STATUS_FLOW['sent'];
                   return (

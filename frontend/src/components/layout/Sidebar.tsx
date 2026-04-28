@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Bot, Stethoscope, Pill, FileText,
   Heart, Calendar, Siren, Settings, ScanLine, MapPin,
   Globe, ChevronDown, User, Brain, Microscope, Camera, BriefcaseMedical,
-  Menu, X, Navigation, CreditCard, Sparkles, Building2, Radio
+  Menu, X, Navigation, CreditCard, Sparkles, Building2, Radio, BarChart2
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useLanguage, Language } from '@/context/LanguageContext';
@@ -21,6 +21,7 @@ export default function Sidebar() {
     { icon: Navigation, label: 'Healthcare Navigator', href: '/dashboard/healthcare-navigator', featured: true },
     { icon: Radio, label: 'Crisis Command', href: '/dashboard/crisis', crisis: true },
     { icon: Heart, label: 'My Medical Profile', href: '/dashboard/profile', profile: true },
+    { icon: BarChart2, label: 'Health Analytics', href: '/dashboard/analytics' },
     { icon: Bot, label: t('askAIDoctor'), href: '/dashboard/ai' },
     { icon: Stethoscope, label: t('symptomChecker'), href: '/dashboard/symptoms' },
     { icon: Pill, label: t('medicineFinder'), href: '/dashboard/medicines' },

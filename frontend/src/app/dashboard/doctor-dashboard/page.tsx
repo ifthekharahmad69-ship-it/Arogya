@@ -1,471 +1,368 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useUser } from '@clerk/nextjs';
 import {
-  User, Phone, MapPin, Building2, Stethoscope, GraduationCap,
-  Clock, IndianRupee, Camera, Save, Trash2, Edit3, Plus,
-  CheckCircle2, AlertCircle, Loader2, X, Languages, FileText
+  Stethoscope, User, Heart, Pill, AlertCircle, Clock,
+  Phone, Calendar, ChevronDown, ChevronUp, Search,
+  Activity, Droplets, ShieldAlert, Building2, Loader2
 } from 'lucide-react';
-import api from '@/lib/api';
 
-interface DoctorProfile {
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+interface PatientCard {
   id: string;
-  user_id: string;
   name: string;
-  phone: string;
-  location: string;
-  specialization: string;
-  qualification: string;
-  experience: number;
-  consultation_fee: number;
-  hospital_name: string;
-  hospital_image: string;
-  profile_image: string;
-  bio: string;
-  languages: string[];
-  rating: number;
-  total_reviews: number;
-  is_available: boolean;
-  created_at: string;
+  age: number;
+  gender: string;
+  blood_group: string;
+  conditions: string;
+  medications: string;
+  allergies: string;
+  bp: string;
+  sugar: string | number;
+  pulse: string | number;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  organ_donor: boolean;
+  has_insurance: boolean;
+  insurance_provider: string;
+  doctor_notes: string;
 }
 
-const SPECIALIZATIONS = [
-  'General Medicine', 'Cardiology', 'Dermatology', 'Pediatrics',
-  'Neurology', 'Orthopedics', 'Gynecology', 'ENT',
-  'Ophthalmology', 'Psychiatry', 'Urology', 'Oncology',
-  'Dentistry', 'General Surgery', 'Pulmonology', 'Gastroenterology',
-];
+interface Appointment {
+  appointment_id: string;
+  patient_name: string;
+  scheduled_time: string;
+  type: string;
+  status: string;
+  notes: string;
+  patient_id?: string;
+}
 
-const LANGUAGES = ['English', 'Hindi', 'Telugu', 'Tamil', 'Kannada', 'Marathi', 'Bengali', 'Gujarati', 'Malayalam', 'Urdu'];
+// Status badge colours
+const STATUS_COLORS: Record<string, string> = {
+  confirmed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
+  pending:   'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
+  cancelled: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+  completed: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',
+};
+
+function VitalChip({ label, value, unit, normal }: { label: string; value: string | number; unit?: string; normal: boolean }) {
+  return (
+    <div className={`flex flex-col items-center px-3 py-2 rounded-xl border ${
+      normal ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800'
+             : 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
+    }`}>
+      <span className="text-xs text-slate-400 font-semibold">{label}</span>
+      <span className={`text-sm font-black ${normal ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
+        {value}{unit && <span className="text-xs font-normal ml-0.5">{unit}</span>}
+      </span>
+    </div>
+  );
+}
 
 export default function DoctorDashboardPage() {
-  const [profile, setProfile] = useState<DoctorProfile | null>(null);
+  const { user } = useUser();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [search, setSearch] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [patientCards, setPatientCards] = useState<Record<string, PatientCard | null>>({});
+  const [loadingCard, setLoadingCard] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'today' | 'confirmed' | 'pending'>('today');
 
-  // Form state
-  const [form, setForm] = useState({
-    name: '', phone: '', location: '', specialization: '',
-    qualification: '', experience: 0, consultationFee: 0,
-    hospitalName: '', bio: '', languages: [] as string[],
-    isAvailable: true,
-  });
-  const [profileImagePreview, setProfileImagePreview] = useState('');
-  const [profileImageData, setProfileImageData] = useState('');
-  const [hospitalImagePreview, setHospitalImagePreview] = useState('');
-  const [hospitalImageData, setHospitalImageData] = useState('');
-
-  const profileImageRef = useRef<HTMLInputElement>(null);
-  const hospitalImageRef = useRef<HTMLInputElement>(null);
-
-  const showToast = useCallback((message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  }, []);
-
-  // Compress image
-  const compressImage = (file: File, maxWidth = 800, quality = 0.8): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let { width, height } = img;
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return reject(new Error('Canvas error'));
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.onerror = reject;
-      img.src = URL.createObjectURL(file);
-    });
-  };
-
-  // Fetch profile
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await api.getMyDoctorProfile();
-        if (res.success && res.profile) {
-          setProfile(res.profile);
-          setForm({
-            name: res.profile.name || '',
-            phone: res.profile.phone || '',
-            location: res.profile.location || '',
-            specialization: res.profile.specialization || '',
-            qualification: res.profile.qualification || '',
-            experience: res.profile.experience || 0,
-            consultationFee: res.profile.consultation_fee || 0,
-            hospitalName: res.profile.hospital_name || '',
-            bio: res.profile.bio || '',
-            languages: res.profile.languages || [],
-            isAvailable: res.profile.is_available ?? true,
-          });
-          if (res.profile.profile_image) setProfileImagePreview(res.profile.profile_image);
-          if (res.profile.hospital_image) setHospitalImagePreview(res.profile.hospital_image);
+    if (!user) return;
+    fetch(`${API}/api/appointments/doctor/${user.id}`, {
+      headers: { 'x-user-id': user.id }
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) setAppointments(data.appointments || []);
+        else {
+          // demo appointments if no real ones
+          setAppointments([
+            { appointment_id: 'a1', patient_name: 'Ravi Kumar', scheduled_time: new Date().toISOString(), type: 'General Checkup', status: 'confirmed', notes: 'Routine follow-up' },
+            { appointment_id: 'a2', patient_name: 'Priya Sharma', scheduled_time: new Date(Date.now() + 3600000).toISOString(), type: 'Cardiology', status: 'pending', notes: 'BP monitoring' },
+            { appointment_id: 'a3', patient_name: 'Mohammed Ali', scheduled_time: new Date(Date.now() + 7200000).toISOString(), type: 'Diabetology', status: 'confirmed', notes: 'Sugar level review' },
+          ]);
         }
-      } catch {
-        showToast('Failed to load profile', 'error');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [showToast]);
+      })
+      .catch(() => {
+        setAppointments([
+          { appointment_id: 'a1', patient_name: 'Ravi Kumar', scheduled_time: new Date().toISOString(), type: 'General Checkup', status: 'confirmed', notes: 'Routine follow-up' },
+          { appointment_id: 'a2', patient_name: 'Priya Sharma', scheduled_time: new Date(Date.now() + 3600000).toISOString(), type: 'Cardiology', status: 'pending', notes: 'BP monitoring' },
+          { appointment_id: 'a3', patient_name: 'Mohammed Ali', scheduled_time: new Date(Date.now() + 7200000).toISOString(), type: 'Diabetology', status: 'confirmed', notes: 'Sugar level review' },
+        ]);
+      })
+      .finally(() => setLoading(false));
+  }, [user]);
 
-  // Handle image selection
-  const handleImageSelect = async (file: File, type: 'profile' | 'hospital') => {
-    if (!file || !file.type.startsWith('image/')) return;
+  const loadPatientCard = async (appt: Appointment) => {
+    const id = appt.appointment_id;
+    if (expandedId === id) { setExpandedId(null); return; }
+    setExpandedId(id);
+    if (patientCards[id] !== undefined) return;
+
+    setLoadingCard(id);
     try {
-      const compressed = await compressImage(file);
-      if (type === 'profile') {
-        setProfileImagePreview(compressed);
-        setProfileImageData(compressed);
+      // Try to get the medical profile for this patient
+      const patientId = appt.patient_id || 'demo';
+      const res = await fetch(`${API}/api/medical-profile/emergency-card`, {
+        headers: { 'x-user-id': patientId }
+      }).then(r => r.json());
+
+      if (res.success && res.card) {
+        setPatientCards(prev => ({ ...prev, [id]: res.card }));
       } else {
-        setHospitalImagePreview(compressed);
-        setHospitalImageData(compressed);
+        // Show demo card
+        setPatientCards(prev => ({
+          ...prev, [id]: {
+            id: patientId, name: appt.patient_name, age: 42, gender: 'Male',
+            blood_group: 'B+', conditions: 'Hypertension, Type 2 Diabetes',
+            medications: 'Metformin 500mg, Amlodipine 5mg',
+            allergies: 'Penicillin', bp: '138/88', sugar: 142, pulse: 84,
+            emergency_contact_name: 'Sunita Kumar', emergency_contact_phone: '+91 98765 43210',
+            organ_donor: false, has_insurance: true, insurance_provider: 'Star Health',
+            doctor_notes: 'Patient requires regular BP monitoring. Advised low-sodium diet.',
+          }
+        }));
       }
     } catch {
-      showToast('Failed to process image', 'error');
-    }
-  };
-
-  // Save / Create
-  const handleSave = async () => {
-    if (!form.name || !form.phone || !form.location) {
-      showToast('Name, phone, and location are required.', 'error');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const payload: Record<string, unknown> = { ...form };
-      if (profileImageData) payload.profileImage = profileImageData;
-      if (hospitalImageData) payload.hospitalImage = hospitalImageData;
-
-      let res;
-      if (profile) {
-        res = await api.updateDoctorProfile(payload);
-      } else {
-        res = await api.createDoctorProfile(payload);
-      }
-
-      if (res.success) {
-        setProfile(res.profile);
-        setEditing(false);
-        setProfileImageData('');
-        setHospitalImageData('');
-        showToast(profile ? 'Profile updated!' : 'Profile created!', 'success');
-      } else {
-        showToast(res.message || 'Save failed', 'error');
-      }
-    } catch {
-      showToast('Save failed. Please try again.', 'error');
+      setPatientCards(prev => ({ ...prev, [id]: null }));
     } finally {
-      setSaving(false);
+      setLoadingCard(null);
     }
   };
 
-  // Delete
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete your doctor profile? This cannot be undone.')) return;
-    setSaving(true);
-    try {
-      const res = await api.deleteDoctorProfile();
-      if (res.success) {
-        setProfile(null);
-        setForm({ name: '', phone: '', location: '', specialization: '', qualification: '', experience: 0, consultationFee: 0, hospitalName: '', bio: '', languages: [], isAvailable: true });
-        setProfileImagePreview('');
-        setHospitalImagePreview('');
-        setEditing(false);
-        showToast('Profile deleted.', 'success');
-      } else {
-        showToast(res.message || 'Delete failed', 'error');
-      }
-    } catch {
-      showToast('Delete failed.', 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const today = new Date().toDateString();
+  const filtered = appointments.filter(a => {
+    const matchSearch = a.patient_name.toLowerCase().includes(search.toLowerCase()) ||
+                        a.type.toLowerCase().includes(search.toLowerCase());
+    if (!matchSearch) return false;
+    if (filter === 'today') return new Date(a.scheduled_time).toDateString() === today;
+    if (filter === 'confirmed') return a.status === 'confirmed';
+    if (filter === 'pending') return a.status === 'pending';
+    return true;
+  });
 
-  const toggleLanguage = (lang: string) => {
-    setForm(f => ({
-      ...f,
-      languages: f.languages.includes(lang)
-        ? f.languages.filter(l => l !== lang)
-        : [...f.languages, lang],
-    }));
-  };
-
-  const isEditing = editing || !profile;
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-8 w-8 text-violet-500 animate-spin" />
-      </div>
-    );
-  }
+  const todayCount = appointments.filter(a => new Date(a.scheduled_time).toDateString() === today).length;
+  const pendingCount = appointments.filter(a => a.status === 'pending').length;
+  const confirmedCount = appointments.filter(a => a.status === 'confirmed').length;
 
   return (
-    <div className="space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-8 duration-500">
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-6 right-6 z-[200] flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl text-white text-sm font-semibold animate-in slide-in-from-right-8 duration-300 ${toast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`}>
-          {toast.type === 'success' ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-          {toast.message}
-        </div>
-      )}
+    <div className="space-y-6 pb-12 max-w-4xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-violet-500 to-purple-600 p-2.5 rounded-xl shadow-lg shadow-violet-500/30">
-            <Stethoscope className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-slate-900">Doctor Dashboard</h1>
-            <p className="text-sm text-slate-500">{profile ? 'Manage your doctor profile' : 'Create your doctor profile'}</p>
-          </div>
-        </div>
-        {profile && !editing && (
-          <div className="flex gap-3">
-            <button onClick={() => setEditing(true)}
-              className="flex items-center gap-2 bg-violet-500 hover:bg-violet-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-violet-500/25 transition-all hover:-translate-y-0.5">
-              <Edit3 className="h-4 w-4" /> Edit Profile
-            </button>
-            <button onClick={handleDelete}
-              className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-red-500/25 transition-all hover:-translate-y-0.5">
-              <Trash2 className="h-4 w-4" /> Delete
-            </button>
-          </div>
-        )}
+      <div>
+        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+          <Stethoscope className="h-7 w-7 text-indigo-500" /> Doctor Dashboard
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+          View patient medical cards before and during appointments
+        </p>
       </div>
 
-      {/* Profile View / Edit Form */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Images */}
-        <div className="space-y-6">
-          {/* Profile Image */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-lg p-6">
-            <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
-              <Camera className="h-4 w-4 text-violet-500" /> Profile Photo
-            </h3>
-            <div className="relative group">
-              <div className="w-full aspect-square rounded-2xl overflow-hidden bg-slate-100 border-2 border-dashed border-slate-200">
-                {profileImagePreview ? (
-                  <img src={profileImagePreview} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                    <User className="h-16 w-16 mb-2" />
-                    <span className="text-sm font-medium">No photo</span>
+      {/* KPI row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Today's Patients", value: todayCount, color: 'indigo', icon: Calendar },
+          { label: 'Confirmed',        value: confirmedCount, color: 'emerald', icon: Activity },
+          { label: 'Pending',          value: pendingCount, color: 'amber', icon: Clock },
+          { label: 'Total',            value: appointments.length, color: 'slate', icon: User },
+        ].map(s => (
+          <div key={s.label} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-4 shadow-sm">
+            <div className={`p-2 rounded-xl w-fit mb-2 ${
+              s.color === 'indigo' ? 'bg-indigo-100 dark:bg-indigo-900' :
+              s.color === 'emerald' ? 'bg-emerald-100 dark:bg-emerald-900' :
+              s.color === 'amber' ? 'bg-amber-100 dark:bg-amber-900' : 'bg-slate-100 dark:bg-slate-700'
+            }`}>
+              <s.icon className={`h-4 w-4 ${
+                s.color === 'indigo' ? 'text-indigo-600' :
+                s.color === 'emerald' ? 'text-emerald-600' :
+                s.color === 'amber' ? 'text-amber-600' : 'text-slate-500'
+              }`} />
+            </div>
+            <p className="text-2xl font-black text-slate-900 dark:text-white">{s.value}</p>
+            <p className="text-xs text-slate-500 font-semibold">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Search + Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search patient or appointment type…"
+            className="w-full pl-9 pr-3 py-2.5 border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/30" />
+        </div>
+        <div className="flex gap-2">
+          {(['all', 'today', 'confirmed', 'pending'] as const).map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`px-3 py-2 rounded-xl text-xs font-bold capitalize transition-all ${
+                filter === f ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300'
+              }`}>{f}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Appointment list */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-10 text-center">
+          <Calendar className="h-10 w-10 text-slate-200 mx-auto mb-3" />
+          <p className="font-bold text-slate-400">No appointments found</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(appt => {
+            const isExpanded = expandedId === appt.appointment_id;
+            const card = patientCards[appt.appointment_id];
+            const time = new Date(appt.scheduled_time);
+            const isToday = time.toDateString() === today;
+
+            return (
+              <div key={appt.appointment_id}
+                className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+
+                {/* Appointment row */}
+                <button onClick={() => loadPatientCard(appt)}
+                  className="w-full flex items-start gap-4 p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors text-left">
+                  <div className="flex-shrink-0 h-11 w-11 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
+                    <span className="text-white font-black text-sm">{appt.patient_name[0]}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-black text-slate-900 dark:text-white">{appt.patient_name}</p>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_COLORS[appt.status] || STATUS_COLORS.pending}`}>
+                        {appt.status}
+                      </span>
+                      {isToday && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">Today</span>}
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      <span className="text-xs text-slate-500 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />{time.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <span className="text-xs text-slate-500">{appt.type}</span>
+                      {appt.notes && <span className="text-xs text-slate-400 truncate max-w-[200px]">{appt.notes}</span>}
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 flex items-center gap-2">
+                    <span className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hidden sm:block">
+                      {isExpanded ? 'Hide' : 'View'} Medical Card
+                    </span>
+                    {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                  </div>
+                </button>
+
+                {/* Expanded Medical Profile Card */}
+                {isExpanded && (
+                  <div className="border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4">
+                    {loadingCard === appt.appointment_id ? (
+                      <div className="flex items-center gap-2 py-4 justify-center">
+                        <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />
+                        <span className="text-sm text-slate-500">Loading medical profile…</span>
+                      </div>
+                    ) : card ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Heart className="h-4 w-4 text-red-500" />
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Medical Profile</span>
+                          <span className="text-xs text-slate-400">— pre-loaded for consultation</span>
+                        </div>
+
+                        {/* Demographics row */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {[
+                            { label: 'Age', value: `${card.age} yrs` },
+                            { label: 'Gender', value: card.gender },
+                            { label: 'Blood Group', value: card.blood_group },
+                            { label: 'Organ Donor', value: card.organ_donor ? '✅ Yes' : '❌ No' },
+                          ].map(f => (
+                            <div key={f.label} className="bg-white dark:bg-slate-800 rounded-xl p-2.5 border border-slate-200 dark:border-slate-700">
+                              <p className="text-xs text-slate-400 font-semibold">{f.label}</p>
+                              <p className="text-sm font-black text-slate-900 dark:text-white">{f.value}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Vitals */}
+                        <div>
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Vitals</p>
+                          <div className="flex gap-2 flex-wrap">
+                            <VitalChip label="BP" value={card.bp || '—'} unit="mmHg"
+                              normal={parseInt(card.bp?.split('/')?.[0] || '120') <= 130} />
+                            <VitalChip label="Sugar" value={card.sugar || '—'} unit="mg/dL"
+                              normal={Number(card.sugar) >= 70 && Number(card.sugar) <= 130} />
+                            <VitalChip label="Pulse" value={card.pulse || '—'} unit="bpm"
+                              normal={Number(card.pulse) >= 60 && Number(card.pulse) <= 100} />
+                          </div>
+                        </div>
+
+                        {/* Clinical info */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {[
+                            { icon: ShieldAlert, label: 'Known Conditions', value: card.conditions, color: 'rose' },
+                            { icon: Pill, label: 'Current Medications', value: card.medications, color: 'indigo' },
+                            { icon: AlertCircle, label: 'Allergies', value: card.allergies, color: 'amber' },
+                            { icon: Building2, label: 'Insurance', value: card.has_insurance ? card.insurance_provider : 'No insurance', color: 'blue' },
+                          ].map(field => (
+                            <div key={field.label} className={`bg-white dark:bg-slate-800 rounded-xl p-3 border ${
+                              field.color === 'rose' ? 'border-rose-200 dark:border-rose-800' :
+                              field.color === 'indigo' ? 'border-indigo-200 dark:border-indigo-800' :
+                              field.color === 'amber' ? 'border-amber-200 dark:border-amber-800' : 'border-blue-200 dark:border-blue-800'
+                            }`}>
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <field.icon className={`h-3.5 w-3.5 ${
+                                  field.color === 'rose' ? 'text-rose-500' :
+                                  field.color === 'indigo' ? 'text-indigo-500' :
+                                  field.color === 'amber' ? 'text-amber-500' : 'text-blue-500'
+                                }`} />
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{field.label}</span>
+                              </div>
+                              <p className="text-sm text-slate-800 dark:text-slate-200 font-semibold">{field.value || '—'}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Doctor notes */}
+                        {card.doctor_notes && (
+                          <div className="bg-indigo-50 dark:bg-indigo-950/30 rounded-xl p-3 border border-indigo-200 dark:border-indigo-800">
+                            <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">Previous Doctor Notes</p>
+                            <p className="text-sm text-indigo-900 dark:text-indigo-200">{card.doctor_notes}</p>
+                          </div>
+                        )}
+
+                        {/* Emergency contact */}
+                        {card.emergency_contact_name && (
+                          <div className="flex items-center gap-3 text-sm bg-white dark:bg-slate-800 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+                            <Phone className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                            <div>
+                              <span className="font-bold text-slate-700 dark:text-slate-300">{card.emergency_contact_name}</span>
+                              <span className="text-slate-400 ml-2">{card.emergency_contact_phone}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-slate-400">
+                        <User className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                        <p className="text-sm font-semibold">No medical profile found for this patient</p>
+                        <p className="text-xs mt-1">Patient can set one up at <span className="font-mono">/dashboard/profile</span></p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-              {isEditing && (
-                <button onClick={() => profileImageRef.current?.click()}
-                  className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
-                  <Camera className="h-8 w-8 text-white" />
-                </button>
-              )}
-              <input ref={profileImageRef} type="file" accept="image/*" className="hidden"
-                onChange={e => { if (e.target.files?.[0]) handleImageSelect(e.target.files[0], 'profile'); e.target.value = ''; }} />
-            </div>
-          </div>
-
-          {/* Hospital Image */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-lg p-6">
-            <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-violet-500" /> Hospital Photo
-            </h3>
-            <div className="relative group">
-              <div className="w-full aspect-video rounded-xl overflow-hidden bg-slate-100 border-2 border-dashed border-slate-200">
-                {hospitalImagePreview ? (
-                  <img src={hospitalImagePreview} alt="Hospital" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                    <Building2 className="h-12 w-12 mb-2" />
-                    <span className="text-sm font-medium">No hospital photo</span>
-                  </div>
-                )}
-              </div>
-              {isEditing && (
-                <button onClick={() => hospitalImageRef.current?.click()}
-                  className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
-                  <Camera className="h-8 w-8 text-white" />
-                </button>
-              )}
-              <input ref={hospitalImageRef} type="file" accept="image/*" className="hidden"
-                onChange={e => { if (e.target.files?.[0]) handleImageSelect(e.target.files[0], 'hospital'); e.target.value = ''; }} />
-            </div>
-          </div>
+            );
+          })}
         </div>
-
-        {/* Right: Form */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-lg p-6 space-y-5">
-            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Basic Information</h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Name */}
-              <div>
-                <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-1.5">
-                  <User className="h-3.5 w-3.5 text-violet-500" /> Name <span className="text-red-500">*</span>
-                </label>
-                <input type="text" value={form.name} disabled={!isEditing}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="Dr. John Doe"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 outline-none disabled:bg-slate-50 disabled:text-slate-600 transition-all" />
-              </div>
-
-              {/* Phone */}
-              <div>
-                <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-1.5">
-                  <Phone className="h-3.5 w-3.5 text-violet-500" /> Phone <span className="text-red-500">*</span>
-                </label>
-                <input type="tel" value={form.phone} disabled={!isEditing}
-                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                  placeholder="+91 9876543210"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 outline-none disabled:bg-slate-50 disabled:text-slate-600 transition-all" />
-              </div>
-
-              {/* Location */}
-              <div>
-                <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-violet-500" /> Location <span className="text-red-500">*</span>
-                </label>
-                <input type="text" value={form.location} disabled={!isEditing}
-                  onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-                  placeholder="Mumbai, Maharashtra"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 outline-none disabled:bg-slate-50 disabled:text-slate-600 transition-all" />
-              </div>
-
-              {/* Specialization */}
-              <div>
-                <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-1.5">
-                  <Stethoscope className="h-3.5 w-3.5 text-violet-500" /> Specialization
-                </label>
-                <select value={form.specialization} disabled={!isEditing}
-                  onChange={e => setForm(f => ({ ...f, specialization: e.target.value }))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 outline-none disabled:bg-slate-50 disabled:text-slate-600 transition-all">
-                  <option value="">Select specialization</option>
-                  {SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-
-              {/* Qualification */}
-              <div>
-                <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-1.5">
-                  <GraduationCap className="h-3.5 w-3.5 text-violet-500" /> Qualification
-                </label>
-                <input type="text" value={form.qualification} disabled={!isEditing}
-                  onChange={e => setForm(f => ({ ...f, qualification: e.target.value }))}
-                  placeholder="MBBS, MD"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 outline-none disabled:bg-slate-50 disabled:text-slate-600 transition-all" />
-              </div>
-
-              {/* Experience */}
-              <div>
-                <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-1.5">
-                  <Clock className="h-3.5 w-3.5 text-violet-500" /> Experience (years)
-                </label>
-                <input type="number" value={form.experience} disabled={!isEditing} min={0}
-                  onChange={e => setForm(f => ({ ...f, experience: parseInt(e.target.value) || 0 }))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 outline-none disabled:bg-slate-50 disabled:text-slate-600 transition-all" />
-              </div>
-
-              {/* Consultation Fee */}
-              <div>
-                <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-1.5">
-                  <IndianRupee className="h-3.5 w-3.5 text-violet-500" /> Consultation Fee (₹)
-                </label>
-                <input type="number" value={form.consultationFee} disabled={!isEditing} min={0}
-                  onChange={e => setForm(f => ({ ...f, consultationFee: parseInt(e.target.value) || 0 }))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 outline-none disabled:bg-slate-50 disabled:text-slate-600 transition-all" />
-              </div>
-
-              {/* Hospital Name */}
-              <div>
-                <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-1.5">
-                  <Building2 className="h-3.5 w-3.5 text-violet-500" /> Hospital Name
-                </label>
-                <input type="text" value={form.hospitalName} disabled={!isEditing}
-                  onChange={e => setForm(f => ({ ...f, hospitalName: e.target.value }))}
-                  placeholder="City Hospital"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 outline-none disabled:bg-slate-50 disabled:text-slate-600 transition-all" />
-              </div>
-            </div>
-
-            {/* Bio */}
-            <div>
-              <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-1.5">
-                <FileText className="h-3.5 w-3.5 text-violet-500" /> About / Bio
-              </label>
-              <textarea value={form.bio} disabled={!isEditing} rows={3}
-                onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
-                placeholder="Tell patients about yourself..."
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 outline-none disabled:bg-slate-50 disabled:text-slate-600 transition-all resize-none" />
-            </div>
-
-            {/* Languages */}
-            <div>
-              <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-2">
-                <Languages className="h-3.5 w-3.5 text-violet-500" /> Languages Spoken
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {LANGUAGES.map(lang => (
-                  <button key={lang} disabled={!isEditing}
-                    onClick={() => isEditing && toggleLanguage(lang)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      form.languages.includes(lang)
-                        ? 'bg-violet-500 text-white shadow-md shadow-violet-500/25'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:hover:bg-slate-100'
-                    }`}>
-                    {lang}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Availability toggle */}
-            {isEditing && (
-              <div className="flex items-center gap-3 pt-2">
-                <button onClick={() => setForm(f => ({ ...f, isAvailable: !f.isAvailable }))}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${form.isAvailable ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.isAvailable ? 'translate-x-6' : ''}`} />
-                </button>
-                <span className="text-sm font-bold text-slate-700">
-                  {form.isAvailable ? '✅ Available for consultations' : '❌ Not available'}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Action buttons */}
-          {isEditing && (
-            <div className="flex gap-3">
-              <button onClick={handleSave} disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-violet-500/25 transition-all hover:-translate-y-0.5 disabled:opacity-50">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                {saving ? 'Saving...' : profile ? 'Update Profile' : 'Create Profile'}
-              </button>
-              {profile && (
-                <button onClick={() => setEditing(false)} disabled={saving}
-                  className="px-6 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all">
-                  Cancel
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
