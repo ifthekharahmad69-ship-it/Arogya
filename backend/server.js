@@ -140,12 +140,26 @@ require('./services/socketService')(io);
 
 // Responder location relay — ambulance driver → patient crisis screen
 io.on('connection', (socket) => {
+  // ── Hospital Portal: join its own room so incoming_patient events reach it ──
+  socket.on('hospital_join', (hospitalId) => {
+    socket.join('hospital_portal');
+    console.log(`[Hospital] Socket ${socket.id} joined hospital_portal (${hospitalId})`);
+  });
+
+  // ── Incident room: guest SOS + responder app join per-incident room ──
+  socket.on('join_incident', (incidentId) => {
+    socket.join(`incident_${incidentId}`);
+    console.log(`[Crisis] Socket ${socket.id} joined incident_${incidentId}`);
+  });
+
+  // ── Responder GPS location relay → guest crisis screen ──
   socket.on('responder_location', (data) => {
     // Broadcast to everyone watching this incident
     socket.broadcast.emit('responder_location', data);
     io.emit(`responder_location_${data.incidentId}`, data);
   });
 });
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {

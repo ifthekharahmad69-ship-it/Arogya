@@ -281,6 +281,31 @@ function CrisisReportPage() {
           } : prev);
         }
         setStep('live');
+
+        // ── AUTO-PROGRESS STATUS STEPS ──
+        // accepted (12s) → enroute (25s) → arrived (45s)
+        const STATUS_PROGRESSION = [
+          { status: 'accepted', delay: 12000 },
+          { status: 'enroute',  delay: 25000 },
+          { status: 'arrived',  delay: 45000 },
+        ];
+        STATUS_PROGRESSION.forEach(({ status, delay }) => {
+          setTimeout(async () => {
+            try {
+              const r = await fetchWithTimeout(`${API}/api/crisis/status/${incident.id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status }),
+              }).then(r => r.json());
+              if (r.success) setIncident(r.incident);
+              else setIncident(prev => prev ? { ...prev, status } : prev);
+            } catch {
+              // Demo: progress locally even if backend unreachable
+              setIncident(prev => prev ? { ...prev, status } : prev);
+            }
+          }, delay);
+        });
+
       }, 2000);
 
     } catch (err) {
