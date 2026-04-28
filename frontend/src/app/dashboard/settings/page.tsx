@@ -4,10 +4,11 @@ import { useState, useRef, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useTheme } from '@/context/ThemeContext';
+import { useLanguage, Language } from '@/context/LanguageContext';
 import {
   User, Heart, Sun, Moon, Monitor, Bell, Shield,
   Camera, CheckCircle2, ChevronRight, Save, Loader2,
-  Globe, Lock, LogOut, Trash2, Edit2, Upload
+  Globe, Lock, LogOut, Trash2, Edit2, Upload, Languages
 } from 'lucide-react';
 
 type SettingsTab = 'profile' | 'appearance' | 'notifications' | 'privacy';
@@ -18,9 +19,21 @@ const THEME_OPTIONS = [
   { value: 'system', label: 'System', icon: Monitor, desc: 'Follows your device setting' },
 ] as const;
 
+const LANGUAGE_OPTIONS: { value: Language; label: string; native: string; flag: string }[] = [
+  { value: 'en',  label: 'English',    native: 'English',    flag: '🇬🇧' },
+  { value: 'hi',  label: 'Hindi',      native: 'हिन्दी',      flag: '🇮🇳' },
+  { value: 'te',  label: 'Telugu',     native: 'తెలుగు',      flag: '🇮🇳' },
+  { value: 'ta',  label: 'Tamil',      native: 'தமிழ்',       flag: '🇮🇳' },
+  { value: 'kn',  label: 'Kannada',    native: 'ಕನ್ನಡ',       flag: '🇮🇳' },
+  { value: 'mr',  label: 'Marathi',    native: 'मराठी',       flag: '🇮🇳' },
+  { value: 'bn',  label: 'Bengali',    native: 'বাংলা',       flag: '🇧🇩' },
+  { value: 'bho', label: 'Bhojpuri',   native: 'भोजपुरी',     flag: '🇮🇳' },
+];
+
 export default function SettingsPage() {
   const { user, isLoaded } = useUser();
   const { theme, setTheme, resolvedTheme } = useTheme();
+  const { language, setLanguage, t } = useLanguage();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const [displayName, setDisplayName] = useState('');
@@ -31,7 +44,6 @@ export default function SettingsPage() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Notification prefs (stored locally)
   const [notifs, setNotifs] = useState({
     sos_alerts: true,
     hospital_updates: true,
@@ -55,12 +67,10 @@ export default function SettingsPage() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     setAvatarUploading(true);
-    // Preview immediately
     const reader = new FileReader();
     reader.onload = ev => setAvatarPreview(ev.target?.result as string);
     reader.readAsDataURL(file);
     try {
-      // Upload to Clerk
       await user.setProfileImage({ file });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -94,10 +104,10 @@ export default function SettingsPage() {
   };
 
   const TABS: { key: SettingsTab; label: string; icon: React.ElementType }[] = [
-    { key: 'profile',       label: 'Profile',      icon: User },
-    { key: 'appearance',    label: 'Appearance',   icon: resolvedTheme === 'dark' ? Moon : Sun },
-    { key: 'notifications', label: 'Notifications',icon: Bell },
-    { key: 'privacy',       label: 'Privacy',      icon: Shield },
+    { key: 'profile',       label: t('profile') || 'Profile',         icon: User },
+    { key: 'appearance',    label: t('appearance') || 'Appearance',   icon: resolvedTheme === 'dark' ? Moon : Sun },
+    { key: 'notifications', label: t('notifications') || 'Notifications', icon: Bell },
+    { key: 'privacy',       label: t('privacy') || 'Privacy',         icon: Shield },
   ];
 
   if (!isLoaded) {
@@ -109,24 +119,26 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-3xl mx-auto">
+    <div className="space-y-6 pb-12 max-w-3xl mx-auto">
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Settings</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Manage your account, appearance and preferences</p>
+        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">{t('settings')}</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+          {t('manageAccount') || 'Manage your account, appearance and preferences'}
+        </p>
       </div>
 
       {/* Tab Bar */}
       <div className="flex gap-1.5 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl overflow-x-auto">
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)}
+        {TABS.map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
-              activeTab === t.key
+              activeTab === tab.key
                 ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             }`}>
-            <t.icon className="h-3.5 w-3.5" /> {t.label}
+            <tab.icon className="h-3.5 w-3.5" /> {tab.label}
           </button>
         ))}
       </div>
@@ -138,7 +150,7 @@ export default function SettingsPage() {
           {/* Avatar Card */}
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
             <h2 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-5 flex items-center gap-2">
-              <Camera className="h-4 w-4" /> Profile Picture
+              <Camera className="h-4 w-4" /> {t('profilePicture')}
             </h2>
             <div className="flex items-center gap-6">
               <div className="relative flex-shrink-0">
@@ -165,13 +177,13 @@ export default function SettingsPage() {
                 <div className="flex gap-2 mt-3">
                   <button onClick={() => fileRef.current?.click()}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors shadow-lg shadow-indigo-500/20">
-                    <Upload className="h-3.5 w-3.5" /> Upload Photo
+                    <Upload className="h-3.5 w-3.5" /> {t('uploadPhoto')}
                   </button>
                   <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
                   {avatarPreview && (
                     <button onClick={() => setAvatarPreview(null)}
                       className="px-3 py-2 text-slate-500 dark:text-slate-400 hover:text-red-500 text-sm font-bold rounded-xl transition-colors border border-slate-200 dark:border-slate-600">
-                      Remove
+                      {t('cancel')}
                     </button>
                   )}
                 </div>
@@ -186,18 +198,18 @@ export default function SettingsPage() {
               <Edit2 className="h-4 w-4" /> Account Details
             </h2>
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">Display Name</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">{t('displayName')}</label>
               <input value={displayName} onChange={e => setDisplayName(e.target.value)}
                 className="w-full border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/30"
-                placeholder="Your full name" />
+                placeholder={t('fullName')} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">Email</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">{t('email')}</label>
               <input value={user?.primaryEmailAddress?.emailAddress || ''} disabled
                 className="w-full border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-400 rounded-xl px-3 py-2.5 text-sm cursor-not-allowed" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">Bio (optional)</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">{t('bio')}</label>
               <textarea value={bio} onChange={e => setBio(e.target.value)} rows={2}
                 className="w-full border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 resize-none"
                 placeholder="A short note about yourself…" />
@@ -208,7 +220,7 @@ export default function SettingsPage() {
                   saved ? 'bg-emerald-500 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20'
                 }`}>
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-                {saved ? 'Saved!' : isSaving ? 'Saving…' : 'Save Changes'}
+                {saved ? t('profileSaved') : isSaving ? t('saving') : t('saveChanges')}
               </button>
             </div>
           </div>
@@ -221,8 +233,10 @@ export default function SettingsPage() {
                 <Heart className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div>
-                <p className="font-bold text-slate-900 dark:text-white">Medical Profile</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Blood group, conditions, medications, preferred hospitals</p>
+                <p className="font-bold text-slate-900 dark:text-white">{t('medicalProfile')}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {t('bloodGroup')}, {t('medicalConditions')}, {t('medications')}, {t('preferredHospitals')}
+                </p>
               </div>
             </div>
             <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
@@ -233,9 +247,11 @@ export default function SettingsPage() {
       {/* ─── APPEARANCE TAB ─── */}
       {activeTab === 'appearance' && (
         <div className="space-y-4">
+
+          {/* Theme selector */}
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
             <h2 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-5">
-              Theme & Display
+              Theme &amp; Display
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {THEME_OPTIONS.map(opt => (
@@ -252,32 +268,55 @@ export default function SettingsPage() {
                   </div>
                   <div className="text-center">
                     <p className={`font-black text-sm ${theme === opt.value ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
-                      {opt.label}
+                      {opt.value === 'light' ? t('lightMode') : opt.value === 'dark' ? t('darkMode') : t('systemMode')}
                     </p>
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{opt.desc}</p>
                   </div>
-                  {theme === opt.value && (
-                    <CheckCircle2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                  )}
+                  {theme === opt.value && <CheckCircle2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />}
                 </button>
               ))}
             </div>
-
-            {/* Live preview badge */}
             <div className={`mt-5 p-4 rounded-xl border flex items-center gap-3 ${
-              resolvedTheme === 'dark'
-                ? 'bg-slate-900 border-slate-700 text-slate-200'
-                : 'bg-slate-50 border-slate-200 text-slate-700'
+              resolvedTheme === 'dark' ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'
             }`}>
               {resolvedTheme === 'dark' ? <Moon className="h-4 w-4 text-indigo-400" /> : <Sun className="h-4 w-4 text-amber-500" />}
               <div>
                 <p className="text-sm font-bold">Currently: {resolvedTheme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode'}</p>
-                <p className="text-xs opacity-60 mt-0.5">Changes apply instantly across the app</p>
+                <p className="text-xs opacity-60 mt-0.5">Changes apply instantly across the entire app</p>
               </div>
             </div>
           </div>
 
-          {/* Font / Text size (ui pref, stored locally) */}
+          {/* Language selector */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
+            <h2 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-5 flex items-center gap-2">
+              <Languages className="h-4 w-4" /> Language / भाषा / భాష
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {LANGUAGE_OPTIONS.map(lang => (
+                <button key={lang.value} onClick={() => setLanguage(lang.value)}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 transition-all ${
+                    language === lang.value
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950 shadow-sm'
+                      : 'border-slate-200 dark:border-slate-600 hover:border-emerald-300 dark:hover:border-emerald-700'
+                  }`}>
+                  <span className="text-2xl">{lang.flag}</span>
+                  <span className={`text-xs font-black ${language === lang.value ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-600 dark:text-slate-400'}`}>
+                    {lang.label}
+                  </span>
+                  <span className={`text-xs ${language === lang.value ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                    {lang.native}
+                  </span>
+                  {language === lang.value && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-4">
+              🌐 Selected language applies across the entire app — dashboard, SOS page, hospital portal, settings, and more.
+            </p>
+          </div>
+
+          {/* Display Preferences */}
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
             <h2 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">Display Preferences</h2>
             <div className="space-y-3">
@@ -293,11 +332,10 @@ export default function SettingsPage() {
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{pref.label}</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">{pref.desc}</p>
                     </div>
-                    <button
-                      onClick={() => {
-                        const cur = localStorage.getItem(`arogya-${pref.key}`) === 'true';
-                        localStorage.setItem(`arogya-${pref.key}`, String(!cur));
-                      }}
+                    <button onClick={() => {
+                      const cur = localStorage.getItem(`arogya-${pref.key}`) === 'true';
+                      localStorage.setItem(`arogya-${pref.key}`, String(!cur));
+                    }}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${val ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}>
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${val ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
@@ -313,15 +351,15 @@ export default function SettingsPage() {
       {activeTab === 'notifications' && (
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6 space-y-4">
           <h2 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
-            <Bell className="h-4 w-4" /> Notification Preferences
+            <Bell className="h-4 w-4" /> {t('notifications')}
           </h2>
           <div className="space-y-3">
             {[
-              { key: 'sos_alerts',             label: 'SOS & Emergency Alerts',        desc: 'Critical — cannot be turned off in emergencies', critical: true },
-              { key: 'hospital_updates',        label: 'Hospital Updates',              desc: 'When hospital acknowledges or bed is ready' },
-              { key: 'appointment_reminders',   label: 'Appointment Reminders',        desc: '24 hours before scheduled appointments' },
-              { key: 'health_tips',             label: 'Daily Health Tips',            desc: 'Personalised based on your medical profile' },
-              { key: 'marketing',               label: 'Promotions & Offers',          desc: 'Health packages and partner offers' },
+              { key: 'sos_alerts',           label: 'SOS & Emergency Alerts',     desc: 'Critical — cannot be turned off', critical: true },
+              { key: 'hospital_updates',     label: 'Hospital Updates',           desc: 'When hospital acknowledges or bed is ready' },
+              { key: 'appointment_reminders',label: 'Appointment Reminders',     desc: '24 hours before scheduled appointments' },
+              { key: 'health_tips',          label: 'Daily Health Tips',          desc: 'Personalised based on your medical profile' },
+              { key: 'marketing',            label: 'Promotions & Offers',        desc: 'Health packages and partner offers' },
             ].map(n => (
               <div key={n.key} className="flex items-center justify-between py-3 border-b border-slate-100 dark:border-slate-700 last:border-0">
                 <div>
@@ -348,7 +386,7 @@ export default function SettingsPage() {
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm ${
                 saved ? 'bg-emerald-500 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20'
               }`}>
-              {saved ? <><CheckCircle2 className="h-4 w-4" /> Saved!</> : <><Save className="h-4 w-4" /> Save Preferences</>}
+              {saved ? <><CheckCircle2 className="h-4 w-4" /> {t('profileSaved')}</> : <><Save className="h-4 w-4" /> Save Preferences</>}
             </button>
           </div>
         </div>
@@ -359,12 +397,12 @@ export default function SettingsPage() {
         <div className="space-y-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6 space-y-4">
             <h2 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
-              <Lock className="h-4 w-4" /> Data & Privacy
+              <Lock className="h-4 w-4" /> {t('privacy')}
             </h2>
             {[
               { label: 'Medical Profile Visibility', desc: 'Only visible to you — never shared without consent', val: 'Private', color: 'emerald' },
-              { label: 'SOS Incident Data', desc: 'Shared with hotel staff + hospital during emergencies only', val: 'Emergency Only', color: 'amber' },
-              { label: 'Location Data', desc: 'Used only for hospital proximity search', val: 'App Only', color: 'blue' },
+              { label: 'SOS Incident Data',  desc: 'Shared with hotel staff + hospital during emergencies only', val: 'Emergency Only', color: 'amber' },
+              { label: 'Location Data',      desc: 'Used only for hospital proximity search', val: 'App Only', color: 'blue' },
             ].map(item => (
               <div key={item.label} className="flex items-center justify-between py-3 border-b border-slate-100 dark:border-slate-700 last:border-0">
                 <div>
@@ -387,14 +425,14 @@ export default function SettingsPage() {
             <button className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border border-slate-100 dark:border-slate-700 group">
               <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
                 <LogOut className="h-4 w-4" />
-                <span className="text-sm font-bold">Sign Out</span>
+                <span className="text-sm font-bold">{t('signOut')}</span>
               </div>
               <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-slate-600" />
             </button>
             <button className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors border border-red-100 dark:border-red-900/50 group">
               <div className="flex items-center gap-2 text-red-500">
                 <Trash2 className="h-4 w-4" />
-                <span className="text-sm font-bold">Delete Account & Data</span>
+                <span className="text-sm font-bold">{t('deleteAccount')}</span>
               </div>
               <ChevronRight className="h-4 w-4 text-red-300 group-hover:text-red-500" />
             </button>
