@@ -7,12 +7,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-comp
 
 // Replace these with your actual Firebase config values
 firebase.initializeApp({
-  apiKey:            self.FIREBASE_API_KEY            || 'YOUR_API_KEY',
-  authDomain:        self.FIREBASE_AUTH_DOMAIN        || 'YOUR_PROJECT.firebaseapp.com',
-  projectId:         self.FIREBASE_PROJECT_ID         || 'YOUR_PROJECT_ID',
-  storageBucket:     self.FIREBASE_STORAGE_BUCKET     || 'YOUR_PROJECT.appspot.com',
-  messagingSenderId: self.FIREBASE_MESSAGING_SENDER_ID || 'YOUR_SENDER_ID',
-  appId:             self.FIREBASE_APP_ID             || 'YOUR_APP_ID',
+  apiKey:            "AIzaSyB3PIhU4YtLD3iUn84AsM1LhBp6plV0i4g",
+  authDomain:        "health-aa1b2.firebaseapp.com",
+  projectId:         "health-aa1b2",
+  storageBucket:     "health-aa1b2.firebasestorage.app",
+  messagingSenderId: "931360436117",
+  appId:             "1:931360436117:web:a73eb4749398521dfd509c",
 });
 
 const messaging = firebase.messaging();
