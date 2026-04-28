@@ -63,8 +63,29 @@ const styles = `
     animation: panelIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
   }
 
-  @media (max-width: 480px) {
-    .medibot-panel { width: calc(100vw - 16px); right: 8px; bottom: 90px; height: 70vh; }
+  @media (max-width: 600px) {
+    .medibot-fab { bottom: 20px; right: 16px; width: 58px; height: 58px; }
+    .medibot-panel {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      width: 100% !important;
+      height: 100% !important;
+      border-radius: 0 !important;
+      border: none;
+    }
+    .medibot-close-mobile { display: flex !important; }
+    .medibot-header { padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top)); }
+    .medibot-messages { padding: 12px; }
+    .medibot-input-row { padding: 10px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+    .quick-actions { padding: 8px 12px; gap: 6px; }
+    .quick-action-btn { padding: 7px 11px; font-size: 12px; }
+    .icon-btn { width: 44px; height: 44px; font-size: 18px; border-radius: 12px; }
+    .icon-btn.mic-btn { width: 52px; height: 52px; font-size: 22px; background: rgba(0,200,150,0.15); border-color: rgba(0,200,150,0.4); color: #00c896; }
+    .icon-btn.mic-btn.active { background: rgba(255,75,110,0.25); border-color: #ff4b6e; color: #ff4b6e; }
+    .send-btn { width: 48px; height: 48px; font-size: 18px; }
+    .medibot-input { font-size: 15px; padding: 10px 12px; }
+    .msg-bubble { font-size: 14px; max-width: 85%; }
+    .medibot-title { font-size: 16px; }
   }
 
   @keyframes panelIn {
@@ -630,6 +651,18 @@ export default function MediBotAgent({ userName = "Patient" }) {
         {isOpen && (
           <div className="medibot-panel">
             <div className="medibot-header">
+              {/* Mobile back button */}
+              <button
+                onClick={() => setIsOpen(false)}
+                style={{
+                  display: 'none',
+                  background: 'none', border: 'none', color: '#aab',
+                  fontSize: 22, cursor: 'pointer', padding: '0 4px',
+                  lineHeight: 1, flexShrink: 0,
+                }}
+                className="medibot-close-mobile"
+                title="Close"
+              >←</button>
               <div className="medibot-avatar">🤖</div>
               <div className="medibot-header-info">
                 <div className="medibot-title">MediBot AI</div>
@@ -682,8 +715,8 @@ export default function MediBotAgent({ userName = "Patient" }) {
             <div className="medibot-input-row">
               <div className="input-actions">
                 <button className="icon-btn" onClick={() => fileInputRef.current?.click()} title="Upload image">📸</button>
-                <button className={`icon-btn ${isRecording ? "active" : ""}`} onClick={toggleVoice} title={isRecording ? "Stop recording" : "Voice input"}>
-                  {isRecording ? "⏹" : "🎤"}
+                <button className={`icon-btn mic-btn ${isRecording ? 'active' : ''}`} onClick={toggleVoice} title={isRecording ? 'Stop recording' : 'Voice input'}>
+                  {isRecording ? '⏹' : '🎤'}
                 </button>
               </div>
               <textarea
@@ -702,7 +735,8 @@ export default function MediBotAgent({ userName = "Patient" }) {
               </button>
             </div>
 
-            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageUpload} />
+            <input ref={fileInputRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handleImageUpload} />
+
           </div>
         )}
       </div>
