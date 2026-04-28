@@ -7,7 +7,11 @@ import {
   Building2, MapPin, Copy, CheckCircle2, AlertTriangle
 } from 'lucide-react';
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+// Dynamically use current domain — works in production and local dev
+const BASE_URL = typeof window !== 'undefined'
+  ? window.location.origin
+  : (process.env.NEXT_PUBLIC_BASE_URL || 'https://arogya-rho.vercel.app');
+
 
 interface RoomConfig {
   id: string;

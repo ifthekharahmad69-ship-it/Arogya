@@ -665,10 +665,10 @@ export default function MediBotAgent({ userName = "Patient" }) {
               >←</button>
               <div className="medibot-avatar">🤖</div>
               <div className="medibot-header-info">
-                <div className="medibot-title">MediBot AI</div>
+                <div className="medibot-title">MediBot AI <span style={{fontSize:9,background:'linear-gradient(to right,#6366f1,#ec4899)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',fontWeight:800,letterSpacing:0.5}}>✦ GEMINI</span></div>
                 <div className="medibot-subtitle">
                   <span className="medibot-online-dot" />
-                  Powered by Groq • Always available
+                  ⚡ Gemini Flash · 👁 Vision · Always available
                 </div>
               </div>
               <select className="lang-selector" value={language} onChange={(e) => setLanguage(e.target.value)}>

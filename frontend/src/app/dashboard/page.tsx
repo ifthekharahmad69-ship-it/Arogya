@@ -14,6 +14,7 @@ import { useUser } from '@clerk/nextjs';
 import DiagnosticServices from '@/components/DiagnosticServices';
 import Testimonials from '@/components/Testimonials';
 import HealthcareCTA from '@/components/HealthcareCTA';
+import GeminiBadge from '@/components/GeminiBadge';
 
 export default function Dashboard() {
   const { location, loading: locLoading } = useLocation();
@@ -45,7 +46,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-500 pb-12 w-full">
       {/* Header */}
-      <header className="flex items-center justify-between">
+      <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="bg-emerald-100 p-2 rounded-xl">
             <Activity className="h-5 w-5 text-emerald-600" />
@@ -55,7 +56,13 @@ export default function Dashboard() {
             <p className="text-sm text-slate-500 font-medium">Here&apos;s your health dashboard</p>
           </div>
         </div>
+        <div className="flex flex-wrap gap-2">
+          <GeminiBadge variant="flash" size="sm" />
+          <GeminiBadge variant="vision" size="sm" />
+          <GeminiBadge variant="vertex" size="sm" />
+        </div>
       </header>
+
 
       {/* ── CRISIS COMMAND CENTER BANNER ── */}
       <div className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 rounded-2xl p-5 border border-red-500/30 shadow-xl shadow-red-500/20 relative overflow-hidden">

@@ -132,11 +132,30 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="mt-10 pt-6 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-slate-400">© 2026 Arogya Raksha Healthcare. All rights reserved.</p>
-          <p className="text-sm text-slate-400">Designed with <Heart className="h-3 w-3 inline text-red-400 fill-red-400" /> by Team SSRRK</p>
+        {/* Bottom Bar with Gemini Branding */}
+        <div className="mt-10 pt-6 border-t border-slate-200">
+          {/* Gemini AI Stack Banner */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-5 p-4 bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl">
+            <span className="text-xs font-bold text-slate-400 mr-1">🤖 AI Powered by</span>
+            {[
+              { label: '✦ Gemini', gradient: 'from-blue-400 via-violet-500 to-pink-500' },
+              { label: '⚡ Gemini Flash', gradient: 'from-amber-400 via-orange-500 to-rose-500' },
+              { label: '👁 Gemini Vision', gradient: 'from-cyan-400 via-blue-500 to-indigo-600' },
+              { label: '▲ Vertex AI', gradient: 'from-blue-500 to-cyan-400' },
+              { label: '◆ Gemini Pro', gradient: 'from-violet-500 via-purple-600 to-indigo-600' },
+            ].map((b) => (
+              <span key={b.label}
+                className={`inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-gradient-to-r ${b.gradient} text-white shadow-sm`}>
+                {b.label}
+              </span>
+            ))}
+          </div>
+          <div className="flex flex-col md:flex-row justify-between items-center gap-3">
+            <p className="text-sm text-slate-400">© 2026 Arogya Raksha Healthcare. All rights reserved.</p>
+            <p className="text-sm text-slate-400">Designed with <Heart className="h-3 w-3 inline text-red-400 fill-red-400" /> by Team SSRRK · Built for Google Gemini Hackathon</p>
+          </div>
         </div>
+
       </div>
 
       {/* Floating WhatsApp Button */}
