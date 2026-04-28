@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
 
-const razorpay = new Razorpay({
-  key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
-
 export async function POST(req: NextRequest) {
+  // Lazy init inside handler — prevents cold-start crash if env vars missing
+  const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (!keyId || !keySecret) {
+    console.error('Razorpay keys missing. Set NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in Vercel env vars.');
+    return NextResponse.json(
+      { error: 'Payment gateway not configured. Please contact support.' },
+      { status: 503 }
+    );
+  }
+
+  const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+
   try {
     const body = await req.json();
     const { amount, currency = 'INR', receipt, notes } = body;
@@ -16,9 +25,9 @@ export async function POST(req: NextRequest) {
     }
 
     const order = await razorpay.orders.create({
-      amount: Math.round(amount * 100), // Convert to paise
+      amount: Math.round(amount * 100), // paise
       currency,
-      receipt: receipt || `receipt_${Date.now()}`,
+      receipt: receipt || `rcpt_${Date.now()}`,
       notes: notes || {},
     });
 
@@ -26,12 +35,12 @@ export async function POST(req: NextRequest) {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      keyId,
     });
   } catch (error: any) {
     console.error('Razorpay create order error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to create order' },
+      { error: error?.error?.description || error.message || 'Failed to create order' },
       { status: 500 }
     );
   }
