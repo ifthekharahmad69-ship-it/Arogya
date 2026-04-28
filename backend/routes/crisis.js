@@ -30,7 +30,7 @@ router.get('/responders', (req, res) => {
 // ─────────────────────────────────────────────
 router.post('/create', async (req, res) => {
   try {
-    const { room, floor, guestName, guestId, type = 'medical', symptoms = '' } = req.body;
+    const { room, floor, guestName, guestId, type = 'medical', symptoms = '', medical_profile = null } = req.body;
 
     const incident = {
       id: `INC${Date.now().toString().slice(-6)}`,
@@ -40,7 +40,9 @@ router.post('/create', async (req, res) => {
       guest_id: guestId || null,
       type,
       symptoms,
-      status: 'pending',       // pending → assigned → enroute → arrived → resolved
+      // Attach full medical profile (auto-fetched from user's saved data)
+      medical_profile,           // blood_group, conditions, medications, allergies, bp, preferred_hospital, emergency_contact
+      status: 'pending',
       severity: 'assessing',
       ai_enriched: false,
       assigned_responder: null,

@@ -20,6 +20,7 @@ export default function Sidebar() {
     { icon: LayoutDashboard, label: t('dashboard'), href: '/dashboard' },
     { icon: Navigation, label: 'Healthcare Navigator', href: '/dashboard/healthcare-navigator', featured: true },
     { icon: Radio, label: 'Crisis Command', href: '/dashboard/crisis', crisis: true },
+    { icon: Heart, label: 'My Medical Profile', href: '/dashboard/profile', profile: true },
     { icon: Bot, label: t('askAIDoctor'), href: '/dashboard/ai' },
     { icon: Stethoscope, label: t('symptomChecker'), href: '/dashboard/symptoms' },
     { icon: Pill, label: t('medicineFinder'), href: '/dashboard/medicines' },
@@ -119,6 +120,7 @@ export default function Sidebar() {
               const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/dashboard');
               const isFeatured = (item as any).featured;
               const isCrisis = (item as any).crisis;
+              const isProfile = (item as any).profile;
               return (
                 <li key={index}>
                   {isCrisis ? (
@@ -135,6 +137,23 @@ export default function Sidebar() {
                       {!isActive && (
                         <span className="ml-auto text-[9px] font-black bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-md uppercase tracking-wider animate-pulse">
                           Live
+                        </span>
+                      )}
+                    </Link>
+                  ) : isProfile ? (
+                    <Link
+                      href={item.href}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden ${
+                        isActive
+                          ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/40 font-semibold'
+                          : 'bg-gradient-to-r from-indigo-500/10 to-violet-500/10 text-indigo-300 hover:from-indigo-500/20 hover:to-violet-500/20 border border-indigo-500/20 hover:border-indigo-500/40'
+                      }`}
+                    >
+                      <item.icon className={`h-5 w-5 ${isActive ? 'text-white' : 'text-indigo-400 group-hover:text-indigo-300'}`} />
+                      <span className="text-sm font-bold">{item.label}</span>
+                      {!isActive && (
+                        <span className="ml-auto text-[9px] font-black bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                          ID
                         </span>
                       )}
                     </Link>

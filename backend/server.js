@@ -100,6 +100,7 @@ const healthRoutes = require('./routes/health');
 const mediaRoutes = require('./routes/media');
 const doctorProfileRoutes = require('./routes/doctorProfiles');
 const crisisRoutes = require('./routes/crisis');
+const medicalProfileRoutes = require('./routes/medicalProfile');
 
 // Register routes
 app.use('/api/auth', authRoutes);
@@ -115,10 +116,10 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/health', healthRoutes);
 
-
 app.use('/api/media', mediaRoutes);
 app.use('/api/doctor-profiles', doctorProfileRoutes);
 app.use('/api/crisis', crisisRoutes);
+app.use('/api/medical-profile', medicalProfileRoutes);
 
 // Health check
 const { redisHealth } = require('./services/redisService');

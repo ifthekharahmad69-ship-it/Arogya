@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   ScanLine, Upload, Stethoscope, Heart, Activity, Droplets,
   ChevronRight, Pill, MapPin, Star, Building2, ArrowUpRight,
-  FileUp, Thermometer, AlertCircle, CheckCircle2, Navigation
+  FileUp, Thermometer, AlertCircle, CheckCircle2, Navigation,
+  User, Lock, BadgeAlert
 } from 'lucide-react';
 import { useLocation } from '@/context/LocationContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -21,6 +22,19 @@ export default function Dashboard() {
   const firstName = user?.firstName || 'User';
   const cityName = location?.city || t('selectLocation');
   const areaName = location?.area || '';
+
+  // Medical profile quick-load for dashboard card
+  const [medProfile, setMedProfile] = useState<Record<string, string | boolean | string[]> | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/medical-profile`, {
+      headers: { 'x-user-id': user.id },
+    }).then(r => r.json()).then(res => {
+      if (res.success && res.profile) setMedProfile(res.profile);
+    }).catch(() => {}).finally(() => setProfileLoaded(true));
+  }, [user?.id]);
 
   const [symptoms] = useState([
     { name: 'Fever', severity: '', icon: '🤒' },
@@ -70,6 +84,57 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* ── MEDICAL PROFILE CARD ── */}
+      {profileLoaded && (
+        medProfile ? (
+          <div className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-700 rounded-2xl p-5 border border-indigo-500/30 shadow-xl shadow-indigo-500/20 relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.08),transparent)]" />
+            <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center flex-shrink-0">
+                  <Heart className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-indigo-200 uppercase tracking-wider mb-0.5">
+                    <Lock className="h-3 w-3 inline mr-1" /> Your Medical ID — Private
+                  </p>
+                  <h2 className="text-lg font-extrabold text-white">{(medProfile.full_name as string) || firstName}</h2>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {(medProfile.blood_group as string) && (
+                      <span className="text-xs font-bold bg-red-500/30 text-red-200 px-2 py-0.5 rounded-full">🩸 {medProfile.blood_group as string}</span>
+                    )}
+                    {medProfile.bp_systolic && (
+                      <span className="text-xs font-bold bg-white/15 text-white px-2 py-0.5 rounded-full">BP: {medProfile.bp_systolic}/{medProfile.bp_diastolic}</span>
+                    )}
+                    {((medProfile.conditions as string[]) || []).slice(0,2).map((c: string) => (
+                      <span key={c} className="text-xs font-bold bg-white/15 text-white px-2 py-0.5 rounded-full">{c}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <Link href="/dashboard/profile"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-white text-indigo-700 font-black text-sm rounded-xl shadow-lg hover:scale-105 transition-transform">
+                  <User className="h-4 w-4" /> Edit Profile
+                </Link>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+            <BadgeAlert className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-bold text-amber-800">⚕️ Complete your Medical Profile</p>
+              <p className="text-xs text-amber-700 mt-0.5">Your blood group, conditions and emergency contact will be auto-sent to hospitals during any SOS.</p>
+            </div>
+            <Link href="/dashboard/profile"
+              className="flex-shrink-0 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm rounded-xl transition-colors">
+              Set Up →
+            </Link>
+          </div>
+        )
+      )}
 
       {/* 3-Column Grid */}
 

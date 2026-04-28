@@ -65,8 +65,11 @@ export default function HospitalPortal() {
   const [responderInput, setResponderInput] = useState('Dr. Sharma (ER)');
   const [notesInput, setNotesInput] = useState('');
   const [toasts, setToasts] = useState<string[]>([]);
-  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
   const socketRef = useRef<Socket | null>(null);
+
+  useEffect(() => { setIsMounted(true); }, []);
 
   const addToast = (msg: string) => {
     setToasts(q => [...q, msg]);
@@ -75,11 +78,16 @@ export default function HospitalPortal() {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch(`${API}/api/crisis/hospital/notifications`).then(r => r.json());
+      const res = await fetch(`${API}/api/crisis/hospital/notifications`, {
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(8000),
+      }).then(r => r.json());
       if (res.success) {
         setNotifications(res.notifications);
         setLastUpdate(new Date());
       }
+    } catch (err) {
+      console.warn('Hospital portal: backend not reachable yet', err);
     } finally {
       setIsLoading(false);
     }
@@ -190,7 +198,9 @@ export default function HospitalPortal() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-white/70">Updated: {lastUpdate.toLocaleTimeString()}</span>
+            <span className="text-xs text-white/70" suppressHydrationWarning>
+              {isMounted && lastUpdate ? `Updated: ${lastUpdate.toLocaleTimeString()}` : 'Connecting...'}
+            </span>
             <button onClick={fetchNotifications}
               className="flex items-center gap-1.5 px-3 py-2 bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl text-sm font-bold transition-colors">
               <RefreshCw className="h-3.5 w-3.5" /> Refresh

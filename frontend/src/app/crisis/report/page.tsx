@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
 import {
   AlertTriangle, BellRing, MapPin, User, HeartPulse,
   Send, CheckCircle2, Loader2, Hospital, CreditCard,
   MessageSquare, Shield, PhoneCall, Clock, Activity,
-  Zap, Ambulance, X, Building2, BadgeAlert
+  Zap, Ambulance, X, Building2, BadgeAlert, Heart, Pill
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -57,6 +58,7 @@ const STATUS_STEPS = [
 
 function CrisisReportPage() {
   const searchParams = useSearchParams();
+  const { user } = useUser();
   const preRoom  = searchParams.get('room')  || '';
   const preFloor = searchParams.get('floor') || '';
 
@@ -69,6 +71,24 @@ function CrisisReportPage() {
   const socketRef = useRef<Socket | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ── Medical Profile auto-load ──
+  const [medCard, setMedCard] = useState<Record<string, unknown> | null>(null);
+  const [profileBadge, setProfileBadge] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetch(`${API}/api/medical-profile/emergency-card`, {
+      headers: { 'x-user-id': user.id },
+    }).then(r => r.json()).then(res => {
+      if (res.success && res.card) {
+        setMedCard(res.card);
+        // Auto-fill name from profile
+        setForm(prev => ({ ...prev, name: prev.name || (res.card.full_name as string) || '' }));
+        setProfileBadge(true);
+      }
+    }).catch(() => {});
+  }, [user?.id]);
 
   // Pre-fill from QR
   useEffect(() => {
@@ -138,6 +158,22 @@ function CrisisReportPage() {
       body: JSON.stringify({
         room: form.room, floor: form.floor,
         guestName: form.name, type: form.type, symptoms: form.symptoms,
+        // Attach full medical profile if available — auto-populated from user's saved data
+        medical_profile: medCard ? {
+          blood_group:        medCard.blood_group,
+          conditions:         medCard.conditions_summary,
+          medications:        medCard.medications_summary,
+          allergies:          medCard.allergies_summary,
+          bp:                 medCard.bp,
+          sugar:              medCard.sugar,
+          preferred_hospital: medCard.preferred_hospital_primary,
+          emergency_contact:  medCard.emergency_contact_name
+            ? `${medCard.emergency_contact_name} (${medCard.emergency_contact_phone})`
+            : null,
+          has_insurance:      medCard.has_insurance,
+          organ_donor:        medCard.organ_donor,
+          doctor_notes:       medCard.doctor_notes,
+        } : null,
       }),
     }).then(r => r.json());
 
@@ -222,6 +258,34 @@ function CrisisReportPage() {
             <p className="text-red-100 text-sm">This will instantly alert hotel staff and emergency services.</p>
           </div>
           <div className="p-6 space-y-4">
+            {/* Medical Profile Badge */}
+            {medCard ? (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-3 flex items-start gap-3">
+                <Heart className="h-4 w-4 text-indigo-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-black text-indigo-700 mb-1">✅ Medical Profile Auto-Loaded</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {medCard.blood_group && (
+                      <span className="text-xs bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full">🩸 {medCard.blood_group as string}</span>
+                    )}
+                    {(medCard.conditions_summary as string) && (
+                      <span className="text-xs bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full truncate max-w-[180px]">{medCard.conditions_summary as string}</span>
+                    )}
+                    {(medCard.allergies_summary as string) && (
+                      <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full">⚠️ {medCard.allergies_summary as string}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-indigo-500 mt-1">This data will be sent to hotel staff and the hospital automatically.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center gap-2">
+                <Pill className="h-4 w-4 text-amber-500" />
+                <p className="text-xs text-amber-700 font-semibold">
+                  No medical profile found. <a href="/dashboard/profile" target="_blank" className="underline font-black">Set one up</a> for faster emergency care.
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Your Name *</label>
