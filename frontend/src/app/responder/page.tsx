@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 import { Ambulance, MapPin, Radio, CheckCircle2, Navigation2, AlertTriangle } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-export default function ResponderPage() {
+// ─── Inner component: useSearchParams() must be inside Suspense ───────────────
+function ResponderInner() {
   const params = useSearchParams();
   const incidentId = params.get('incident') || '';
 
@@ -25,22 +26,14 @@ export default function ResponderPage() {
   }, []);
 
   const startTracking = () => {
-    if (!navigator.geolocation) {
-      setError('Geolocation not supported on this device');
-      return;
-    }
+    if (!navigator.geolocation) { setError('Geolocation not supported'); return; }
     setTracking(true);
     watchRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
         setCoords({ lat, lng });
-
         socketRef.current?.emit('responder_location', {
-          incidentId,
-          lat,
-          lng,
-          eta: eta || 5,
-          status: 'en_route',
+          incidentId, lat, lng, eta: eta || 5, status: 'en_route',
         });
       },
       (err) => setError(`GPS error: ${err.message}`),
@@ -58,11 +51,7 @@ export default function ResponderPage() {
 
   const markArrived = () => {
     socketRef.current?.emit('responder_location', {
-      incidentId,
-      lat: coords?.lat,
-      lng: coords?.lng,
-      eta: 0,
-      status: 'arrived',
+      incidentId, lat: coords?.lat, lng: coords?.lng, eta: 0, status: 'arrived',
     });
     stopTracking();
     setArrived(true);
@@ -72,7 +61,6 @@ export default function ResponderPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-950 to-slate-900 flex items-center justify-center p-4">
       <div className="max-w-sm w-full space-y-5">
 
-        {/* Header */}
         <div className="text-center">
           <div className="h-20 w-20 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center mx-auto mb-4">
             <Ambulance className="h-10 w-10 text-white" />
@@ -83,7 +71,6 @@ export default function ResponderPage() {
           </p>
         </div>
 
-        {/* Arrived state */}
         {arrived && (
           <div className="bg-emerald-500/20 border border-emerald-400/40 rounded-2xl p-6 text-center">
             <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto mb-3" />
@@ -92,7 +79,6 @@ export default function ResponderPage() {
           </div>
         )}
 
-        {/* GPS coords display */}
         {coords && !arrived && (
           <div className="bg-white/10 border border-white/20 rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -109,7 +95,6 @@ export default function ResponderPage() {
           </div>
         )}
 
-        {/* ETA input */}
         {!arrived && (
           <div>
             <label className="block text-xs font-bold text-blue-300 mb-1.5 uppercase tracking-wider">ETA (minutes)</label>
@@ -123,7 +108,6 @@ export default function ResponderPage() {
           </div>
         )}
 
-        {/* Error */}
         {error && (
           <div className="bg-red-500/20 border border-red-400/40 rounded-xl p-3 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0" />
@@ -131,7 +115,6 @@ export default function ResponderPage() {
           </div>
         )}
 
-        {/* Action buttons */}
         {!arrived && (
           <div className="space-y-3">
             {!tracking ? (
@@ -145,7 +128,6 @@ export default function ResponderPage() {
                 <Radio className="h-6 w-6 animate-pulse" /> Stop Tracking
               </button>
             )}
-
             {tracking && coords && (
               <button onClick={markArrived}
                 className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg rounded-2xl transition-colors shadow-2xl shadow-emerald-900/50 flex items-center justify-center gap-3">
@@ -160,5 +142,21 @@ export default function ResponderPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+// ─── Default export: Suspense wrapper required for useSearchParams ─────────────
+export default function ResponderPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-950 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-center">
+          <Ambulance className="h-12 w-12 mx-auto mb-3 animate-pulse" />
+          <p className="text-blue-300">Loading responder view…</p>
+        </div>
+      </div>
+    }>
+      <ResponderInner />
+    </Suspense>
   );
 }
