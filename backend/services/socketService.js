@@ -64,6 +64,13 @@ module.exports = function (io) {
       console.log(`Responder ${responderId} online`);
     });
 
+    // Hospital portal: hospital staff join to receive incoming patient alerts
+    socket.on('hospital_join', (hospitalId) => {
+      socket.join('hospital_portal');
+      socket.join(`hospital_${hospitalId}`);
+      console.log(`Hospital ${hospitalId} joined portal`);
+    });
+
     // Crisis chat message via socket (real-time relay)
     socket.on('crisis_message', (data) => {
       const { incidentId, sender, senderRole, text } = data;

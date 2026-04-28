@@ -27,6 +27,16 @@ interface Incident {
   assigned_responder?: { id: string; name: string; role: string };
   hospital_recommendation?: Record<string, { name: string; dist: string; dept: string; tier: string }>;
   cost_estimate?: { range: string; emi_options: string[]; loan_available: boolean };
+  hospital_notification?: {
+    id: string;
+    hospital: string;
+    hospital_dept: string;
+    sent_at: string;
+    status: 'sent' | 'acknowledged' | 'bed_ready' | 'patient_arrived';
+    bed_number?: string;
+    hospital_responder?: string;
+    eta_confirmation?: string;
+  };
   messages: { id: string; sender: string; senderRole: string; text: string; timestamp: string }[];
   ambulance_alert?: { demo_message: string };
   created_at: string;
@@ -130,6 +140,22 @@ export default function CrisisDashboard() {
       setSelected(sel => sel ? { ...sel, messages: [...sel.messages, msg] } : sel);
     });
 
+    socket.on('hospital_acknowledged', (data: { incidentId: string; bed_number: string; hospital: string; eta_confirmation: string }) => {
+      setIncidents(prev => prev.map(i => i.id === data.incidentId
+        ? { ...i, hospital_notification: { ...i.hospital_notification!, status: 'acknowledged', bed_number: data.bed_number } } : i
+      ));
+      setSelected(sel => sel?.id === data.incidentId
+        ? { ...sel, hospital_notification: { ...sel.hospital_notification!, status: 'acknowledged', bed_number: data.bed_number } } : sel
+      );
+      setNotifQueue(q => [...q, `🏥 ${data.hospital} acknowledged — Bed ${data.bed_number} ready`]);
+    });
+
+    socket.on('hospital_bed_ready', (data: { incidentId: string; bed_number: string }) => {
+      setSelected(sel => sel?.id === data.incidentId
+        ? { ...sel, hospital_notification: { ...sel.hospital_notification!, status: 'bed_ready', bed_number: data.bed_number } } : sel
+      );
+    });
+
     return () => { socket.disconnect(); };
   }, []);
 
@@ -226,6 +252,9 @@ export default function CrisisDashboard() {
           <Link href="/dashboard/crisis/qr" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg shadow-indigo-500/25">
             <QrCode className="h-4 w-4" /> QR Codes
           </Link>
+          <a href="/hospital/portal" target="_blank" className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg shadow-emerald-500/25">
+            <Hospital className="h-4 w-4" /> Hospital Portal
+          </a>
           <a href="/crisis/report" target="_blank" className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg shadow-red-500/25">
             <AlertTriangle className="h-4 w-4" /> Guest SOS
           </a>
@@ -473,6 +502,60 @@ export default function CrisisDashboard() {
                         <p className="text-xs text-slate-500 mt-0.5">{h.dist} • {h.tier}</p>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Hospital Bridge — Hotel ↔ Hospital Communication */}
+              {selected.hospital_notification && (
+                <div className={`rounded-2xl p-4 border shadow-sm ${
+                  selected.hospital_notification.status === 'patient_arrived' ? 'bg-emerald-50 border-emerald-200' :
+                  selected.hospital_notification.status === 'bed_ready'       ? 'bg-violet-50 border-violet-200' :
+                  selected.hospital_notification.status === 'acknowledged'    ? 'bg-amber-50 border-amber-200' :
+                  'bg-blue-50 border-blue-200'
+                }`}>
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center justify-between gap-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <Hospital className="h-3.5 w-3.5 text-emerald-600" /> Hotel → Hospital Bridge
+                    </span>
+                    <a href="/hospital/portal" target="_blank"
+                      className="text-xs text-emerald-600 hover:text-emerald-700 font-bold underline">
+                      Open Hospital Portal →
+                    </a>
+                  </h3>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                        <span className="text-sm font-bold text-slate-900">{selected.hospital_notification.hospital}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-3.5 w-3.5 text-slate-400" />
+                        <span className="text-xs text-slate-600">Dept: {selected.hospital_notification.hospital_dept}</span>
+                      </div>
+                      {selected.hospital_notification.bed_number && (
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-violet-500" />
+                          <span className="text-xs font-bold text-violet-700">Bed: {selected.hospital_notification.bed_number}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-xs font-black px-3 py-1.5 rounded-xl ${
+                        selected.hospital_notification.status === 'patient_arrived' ? 'bg-emerald-100 text-emerald-700' :
+                        selected.hospital_notification.status === 'bed_ready'       ? 'bg-violet-100 text-violet-700' :
+                        selected.hospital_notification.status === 'acknowledged'    ? 'bg-amber-100 text-amber-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
+                        {selected.hospital_notification.status === 'sent'            ? '📤 Alert Sent' :
+                         selected.hospital_notification.status === 'acknowledged'    ? '✅ Acknowledged' :
+                         selected.hospital_notification.status === 'bed_ready'       ? '🛏️ Bed Ready' :
+                         '✅ Patient Arrived'}
+                      </span>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {new Date(selected.hospital_notification.sent_at).toLocaleTimeString()}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
