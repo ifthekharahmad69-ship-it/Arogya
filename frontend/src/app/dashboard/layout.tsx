@@ -17,7 +17,7 @@ export default function DashboardLayout({
     <LanguageProvider>
       <LocationProvider>
         <ClerkApiProvider>
-          <div className="min-h-screen bg-slate-50 flex">
+          <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex transition-colors duration-300">
             <Sidebar />
             <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
               <Header />
