@@ -101,6 +101,7 @@ const mediaRoutes = require('./routes/media');
 const doctorProfileRoutes = require('./routes/doctorProfiles');
 const crisisRoutes = require('./routes/crisis');
 const medicalProfileRoutes = require('./routes/medicalProfile');
+const notificationRoutes = require('./routes/notifications');
 
 // Register routes
 app.use('/api/auth', authRoutes);
@@ -120,6 +121,7 @@ app.use('/api/media', mediaRoutes);
 app.use('/api/doctor-profiles', doctorProfileRoutes);
 app.use('/api/crisis', crisisRoutes);
 app.use('/api/medical-profile', medicalProfileRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check
 const { redisHealth } = require('./services/redisService');
@@ -133,8 +135,17 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
-// Socket.io chat
+// Socket.io — chat + crisis + responder location forwarding
 require('./services/socketService')(io);
+
+// Responder location relay — ambulance driver → patient crisis screen
+io.on('connection', (socket) => {
+  socket.on('responder_location', (data) => {
+    // Broadcast to everyone watching this incident
+    socket.broadcast.emit('responder_location', data);
+    io.emit(`responder_location_${data.incidentId}`, data);
+  });
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

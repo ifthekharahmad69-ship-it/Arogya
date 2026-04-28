@@ -10,6 +10,19 @@ import {
   Zap, Ambulance, X, Building2, BadgeAlert, Heart, Pill
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
+import dynamic from 'next/dynamic';
+
+const AmbulanceMap = dynamic(() => import('@/components/AmbulanceMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-64 bg-slate-100 rounded-2xl flex items-center justify-center">
+      <div className="text-center">
+        <Ambulance className="h-8 w-8 text-slate-300 mx-auto mb-2 animate-pulse" />
+        <p className="text-xs text-slate-400">Loading map…</p>
+      </div>
+    </div>
+  ),
+});
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -521,6 +534,30 @@ function CrisisReportPage() {
                  incident.status === 'arrived'  ? '✅ Arrived' : '⏳ Notified'}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* 🗺️ AMBULANCE TRACKING MAP */}
+        {incident?.assigned_responder && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+              <Ambulance className="h-4 w-4 text-blue-500" /> Live Ambulance Tracking
+            </h3>
+            <AmbulanceMap
+              incidentId={incident.id}
+              socket={socketRef.current}
+            />
+            <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+              🔴 Your location &nbsp;|&nbsp; 🚑 Ambulance (live GPS) &nbsp;|&nbsp;
+              <a
+                href={`/responder?incident=${incident.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="underline text-blue-500 font-bold"
+              >
+                Open Responder App →
+              </a>
+            </p>
           </div>
         )}
 
